@@ -127,7 +127,7 @@ export default function VotingPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-6">
+    <section className="mx-auto w-full max-w-3xl space-y-6 overflow-x-hidden">
       <header className="space-y-2">
         <p className="section-kicker">Golden Ballot</p>
         <h1 className="section-title">Halaman Voting</h1>
@@ -138,13 +138,13 @@ export default function VotingPage() {
       </header>
 
       {isCheckingAuth ? (
-        <div className="gold-card p-4 text-sm">
+        <div className="gold-card overflow-hidden p-4 text-sm">
           Mengecek status login...
         </div>
       ) : null}
 
       {!isCheckingAuth && !user ? (
-        <div className="gold-card space-y-2 p-4 text-sm">
+        <div className="gold-card space-y-2 overflow-hidden p-4 text-sm">
           <p>Kamu wajib login dulu untuk mengakses form voting.</p>
           <Link
             href="/login"
@@ -158,28 +158,28 @@ export default function VotingPage() {
       {user ? (
         <form
           onSubmit={onSubmit}
-          className="gold-card grid gap-4 p-6 text-sm"
+          className="gold-card grid gap-4 overflow-hidden p-4 text-sm sm:p-6"
         >
-        <div className="rounded-2xl border border-[--gold-soft] bg-white/65 p-4 text-foreground/80">
-          Login sebagai: <span className="font-semibold">{user.email}</span>. NIM wajib sesuai bagian awal email kampus.
+        <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/65 p-4 text-foreground/80">
+          Login sebagai: <span className="break-all font-semibold">{user.email}</span>. NIM wajib sesuai bagian awal email kampus.
         </div>
-        <label className="grid gap-1">
+        <label className="grid min-w-0 gap-1">
           <span className="font-semibold text-[--maroon]">NIM</span>
           <input
             value={nim}
             onChange={(event) => setNim(event.target.value)}
             required
-            className="input-luxury"
+            className="input-luxury w-full min-w-0"
             placeholder="Masukkan NIM"
           />
         </label>
 
-        <label className="grid gap-1">
+        <label className="grid min-w-0 gap-1">
           <span className="font-semibold text-[--maroon]">Pilih Kandidat</span>
           <select
             value={candidateId}
             onChange={(event) => setCandidateId(event.target.value)}
-            className="input-luxury"
+            className="input-luxury w-full min-w-0"
           >
             {CANDIDATES.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
@@ -189,35 +189,36 @@ export default function VotingPage() {
           </select>
         </label>
 
-        <label className="flex items-center gap-2 rounded-2xl border border-[--gold-soft] bg-white/60 px-4 py-3">
+        <label className="flex min-w-0 items-start gap-3 rounded-2xl border border-[--gold-soft] bg-white/60 px-4 py-3">
           <input
             type="checkbox"
             checked={isHearingAttendee}
             onChange={(event) => setIsHearingAttendee(event.target.checked)}
+            className="mt-1 shrink-0"
           />
-          <span>Peserta hearing (bobot suara 2)</span>
+          <span className="min-w-0 break-words">Peserta hearing (bobot suara 2)</span>
         </label>
 
-        <label className="grid gap-1">
+        <label className="grid min-w-0 gap-1">
           <span className="font-semibold text-[--maroon]">Upload Selfie Verifikasi</span>
           <input
             type="file"
             accept="image/*"
             required
             onChange={(event) => setSelfieFile(event.target.files?.[0] ?? null)}
-            className="input-luxury"
+            className="input-luxury w-full min-w-0 max-w-full"
           />
         </label>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="button-gold inline-flex w-fit items-center justify-center disabled:opacity-60"
+          className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
         >
           {isSubmitting ? "Mengirim..." : "Submit Voting"}
         </button>
 
-        <p className="text-sm text-foreground/80">Status: {statusMessage || "-"}</p>
+        <p className="break-words text-sm text-foreground/80">Status: {statusMessage || "-"}</p>
         </form>
       ) : null}
     </section>

@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <section className="page-shell">
-      <header className="gold-card space-y-5 p-8 md:p-10">
+      <header className="gold-card space-y-5 overflow-hidden p-6 md:p-10">
         <h1 className="section-title max-w-4xl">
           DPA HIMAFI
         </h1>
@@ -24,7 +24,7 @@ export default function Home() {
       </header>
 
       <div className="grid gap-5 md:grid-cols-2">
-        <article className="gold-card p-6">
+        <article className="gold-card overflow-hidden p-6">
           <p className="subtitle-strong">Pemilihan Aktif</p>
           <h2 className="mt-2 font-display text-3xl text-[--maroon]">Satu akun, satu suara</h2>
           <p className="mt-3 text-sm leading-7 text-foreground/75">
@@ -32,13 +32,13 @@ export default function Home() {
           </p>
           <Link
             href="/voting"
-            className="button-gold mt-5 inline-flex"
+            className="button-gold mt-5 inline-flex w-full justify-center sm:w-fit"
           >
             Buka Halaman Voting
           </Link>
         </article>
 
-        <article className="gold-card p-6">
+        <article className="gold-card overflow-hidden p-6">
           <p className="subtitle-strong">Status Pemilih</p>
           <h2 className="mt-2 font-display text-3xl text-[--maroon]">Audit dan transparansi</h2>
           <p className="mt-3 text-sm leading-7 text-foreground/75">
@@ -47,7 +47,7 @@ export default function Home() {
           </p>
           <Link
             href="/profile"
-            className="button-outline mt-5 inline-flex"
+            className="button-outline mt-5 inline-flex w-full justify-center sm:w-fit"
           >
             Buka Profil Saya
           </Link>

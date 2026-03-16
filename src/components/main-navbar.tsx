@@ -70,11 +70,11 @@ export function MainNavbar() {
 
   return (
     <>
-      <header className="border-b border-foreground/15">
+      <header className="overflow-x-hidden border-b border-foreground/15">
         <nav className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <Link href="/" className="font-display text-2xl tracking-wide text-[--maroon]">
+            <div className="min-w-0">
+              <Link href="/" className="font-display break-words text-2xl tracking-wide text-[--maroon]">
                 DPA HIMAFI ITB
               </Link>
             </div>
@@ -104,7 +104,7 @@ export function MainNavbar() {
         />
 
         <aside
-          className={`absolute right-0 top-0 h-full w-80 max-w-[88vw] border-l border-[--gold-soft] bg-[linear-gradient(180deg,#fff9ee,#f4f1e8)] p-5 transition-transform ${isMenuOpen ? "translate-x-0" : "translate-x-full"}`}
+          className={`absolute right-0 top-0 h-full w-80 max-w-[88vw] overflow-x-hidden border-l border-[--gold-soft] bg-[linear-gradient(180deg,#fff9ee,#f4f1e8)] p-5 transition-transform ${isMenuOpen ? "translate-x-0" : "translate-x-full"}`}
         >
           <div className="mb-6 flex items-start justify-between gap-3">
             <div>
@@ -122,17 +122,17 @@ export function MainNavbar() {
             </button>
           </div>
 
-          <div className="flex h-[calc(100%-5.5rem)] flex-col">
+          <div className="flex h-[calc(100%-5.5rem)] min-w-0 flex-col">
             <ul className="grid gap-3 text-sm">
             {primaryMenuItems.map((item) => (
               <li key={item.href}>
                 <Link
                   href={item.href}
                   onClick={closeMenu}
-                  className="flex w-full items-center justify-between rounded-2xl border border-[--gold-soft] bg-white/70 px-4 py-3 font-semibold text-[--maroon]"
+                  className="flex w-full min-w-0 items-center justify-between gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 px-4 py-3 font-semibold text-[--maroon]"
                 >
-                  <span>{item.label}</span>
-                  <span aria-hidden="true">→</span>
+                  <span className="min-w-0 break-words">{item.label}</span>
+                  <span aria-hidden="true" className="shrink-0">→</span>
                 </Link>
               </li>
             ))}

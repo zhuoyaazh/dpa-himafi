@@ -114,7 +114,7 @@ export default function SettingPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-6">
+    <section className="mx-auto w-full max-w-3xl space-y-6 overflow-x-hidden">
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[--gold]">
           Account Settings
@@ -126,7 +126,7 @@ export default function SettingPage() {
         </p>
       </header>
 
-      <div className="gold-card space-y-4 p-6">
+      <div className="gold-card space-y-4 overflow-hidden p-4 sm:p-6">
         {isLoading ? <p>Mengecek sesi login...</p> : null}
 
         {!isLoading && !user ? (
@@ -138,10 +138,10 @@ export default function SettingPage() {
         {user ? (
           <form className="grid gap-4" onSubmit={onSubmit}>
             <div className="rounded-xl border border-[--gold-soft] bg-white/60 p-4 text-sm text-foreground/80">
-              Login sebagai <span className="font-semibold">{user.email}</span>
+              Login sebagai <span className="break-all font-semibold">{user.email}</span>
             </div>
 
-            <label className="grid gap-1">
+            <label className="grid min-w-0 gap-1">
               <span className="font-semibold">Password Lama</span>
               <input
                 type="password"
@@ -152,7 +152,7 @@ export default function SettingPage() {
               />
             </label>
 
-            <label className="grid gap-1">
+            <label className="grid min-w-0 gap-1">
               <span className="font-semibold">Password Baru</span>
               <input
                 type="password"
@@ -164,7 +164,7 @@ export default function SettingPage() {
               />
             </label>
 
-            <label className="grid gap-1">
+            <label className="grid min-w-0 gap-1">
               <span className="font-semibold">Konfirmasi Password Baru</span>
               <input
                 type="password"
@@ -179,14 +179,14 @@ export default function SettingPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="button-gold inline-flex w-fit items-center justify-center disabled:opacity-60"
+              className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
             >
               {isSubmitting ? "Memproses..." : "Simpan Password Baru"}
             </button>
           </form>
         ) : null}
 
-        <p className="text-sm text-foreground/75">Status: {message || "-"}</p>
+        <p className="break-words text-sm text-foreground/75">Status: {message || "-"}</p>
       </div>
     </section>
   );

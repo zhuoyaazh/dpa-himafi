@@ -89,8 +89,8 @@ export default function AdminPage() {
         </p>
       </header>
 
-      <div className="gold-card space-y-4 p-6 text-sm text-foreground/80">
-        <p>Status: {isLoading ? "Memuat..." : message || "-"}</p>
+      <div className="gold-card space-y-4 overflow-hidden p-4 text-sm text-foreground/80 sm:p-6">
+        <p className="break-words">Status: {isLoading ? "Memuat..." : message || "-"}</p>
 
         {isAdmin ? (
           <div className="grid gap-3 md:grid-cols-3">
@@ -110,13 +110,13 @@ export default function AdminPage() {
         ) : null}
 
         {user ? (
-          <div className="rounded-2xl border border-[--gold-soft] bg-white/60 p-4">
-            <p>Email login: <span className="font-semibold">{user.email}</span></p>
-            <p>UID login: <span className="font-semibold">{user.uid}</span></p>
+          <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/60 p-4">
+            <p>Email login: <span className="break-all font-semibold">{user.email}</span></p>
+            <p>UID login: <span className="break-all font-semibold">{user.uid}</span></p>
             {!isAdmin ? (
               <p className="mt-2 text-sm text-foreground/75">
                 Akses admin hanya untuk orang DPA yang didaftarkan manual di collection <span className="font-semibold">admin_users</span>
-                {' '}dengan ID <span className="font-semibold">{user.uid}</span> dan field <span className="font-semibold">active: true</span>.
+                {' '}dengan ID <span className="break-all font-semibold">{user.uid}</span> dan field <span className="font-semibold">active: true</span>.
               </p>
             ) : null}
           </div>
@@ -142,9 +142,9 @@ export default function AdminPage() {
                         : "Waktu tidak tersedia"}
                     </p>
                   </div>
-                  <p className="mt-2">Actor: <span className="font-semibold">{log.actorEmail ?? "-"}</span></p>
-                  <p>UID: <span className="font-semibold">{log.actorUid ?? "-"}</span></p>
-                  <p>
+                  <p className="mt-2 break-words">Actor: <span className="break-all font-semibold">{log.actorEmail ?? "-"}</span></p>
+                  <p className="break-words">UID: <span className="break-all font-semibold">{log.actorUid ?? "-"}</span></p>
+                  <p className="break-words">
                     Metadata: panjang password baru {log.metadata?.passwordLength ?? "-"} karakter
                   </p>
                 </article>

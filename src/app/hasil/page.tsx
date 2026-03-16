@@ -82,7 +82,7 @@ export default function HasilPage() {
 
   return (
     <section className="page-shell">
-      <header className="space-y-2">
+      <header className="space-y-2 overflow-hidden">
         <p className="section-kicker">Result Tableau</p>
         <h1 className="section-title">Hasil Voting</h1>
         <p className="max-w-3xl text-sm text-foreground/75">
@@ -91,7 +91,7 @@ export default function HasilPage() {
         <button
           type="button"
           onClick={refreshResults}
-          className="button-outline inline-flex"
+          className="button-outline inline-flex w-full justify-center sm:w-fit"
           disabled={isLoading}
         >
           {isLoading ? "Memuat..." : "Refresh Hasil"}
@@ -116,9 +116,9 @@ export default function HasilPage() {
       </div>
 
       {topCandidate ? (
-        <section className="gold-card p-6">
+        <section className="gold-card overflow-hidden p-6">
           <p className="subtitle-strong">Peringkat Sementara</p>
-          <h2 className="font-display mt-2 text-3xl text-[--maroon]">
+          <h2 className="font-display mt-2 break-words text-3xl text-[--maroon]">
             {topCandidate.name} memimpin dengan bobot {topCandidate.weightedVotes}
           </h2>
           <p className="mt-2 text-sm text-foreground/75">
@@ -129,17 +129,17 @@ export default function HasilPage() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         {sortedSummary.map((candidate, index) => (
-          <article key={candidate.id} className="gold-card p-6">
+          <article key={candidate.id} className="gold-card overflow-hidden p-6">
             <div className={`rounded-3xl bg-gradient-to-br ${candidate.accent} p-5 text-[#fffaf0]`}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-[0.3em] opacity-80">
                     Rank #{index + 1} · Candidate {candidate.ballotNumber}
                   </p>
-                  <h2 className="font-display mt-3 text-4xl">{candidate.name}</h2>
-                  <p className="mt-2 text-sm opacity-85">{candidate.title}</p>
+                  <h2 className="font-display mt-3 break-words text-4xl">{candidate.name}</h2>
+                  <p className="mt-2 break-words text-sm opacity-85">{candidate.title}</p>
                 </div>
-                <span className="font-display text-4xl">{candidate.suit}</span>
+                <span className="font-display shrink-0 text-4xl">{candidate.suit}</span>
               </div>
             </div>
 

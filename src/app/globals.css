@@ -13,6 +13,12 @@
   --font-display: "Higuen Elegant Serif", var(--font-cormorant), Georgia, serif;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -26,6 +32,18 @@ body {
   color: var(--foreground);
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
   min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
 }
 
 a {
@@ -43,7 +61,7 @@ select {
 }
 
 .page-shell {
-  @apply mx-auto w-full max-w-6xl space-y-8;
+  @apply mx-auto w-full max-w-6xl min-w-0 space-y-8 overflow-x-hidden;
 }
 
 .gold-card {
@@ -70,7 +88,7 @@ select {
 }
 
 .input-luxury {
-  @apply rounded-xl border px-4 py-3 text-sm transition;
+  @apply w-full min-w-0 rounded-xl border px-4 py-3 text-sm transition;
   border-color: rgb(196 154 108 / 0.45);
   background: rgb(255 255 255 / 0.75);
 }
@@ -81,10 +99,12 @@ select {
 }
 
 .button-gold {
-  @apply rounded-full px-5 py-3 text-sm font-bold uppercase tracking-[0.18em];
+  @apply max-w-full rounded-full px-5 py-3 text-center text-sm font-bold uppercase tracking-[0.18em];
   color: #fffaf0;
   background: linear-gradient(135deg, var(--maroon), #5f0d12 55%, var(--gold));
   box-shadow: 0 14px 30px rgb(56 6 9 / 0.16);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .button-gold:hover {
@@ -92,31 +112,39 @@ select {
 }
 
 .button-outline {
-  @apply rounded-full border px-5 py-3 text-sm font-bold uppercase tracking-[0.18em];
+  @apply max-w-full rounded-full border px-5 py-3 text-center text-sm font-bold uppercase tracking-[0.18em];
   border-color: rgb(196 154 108 / 0.55);
   color: var(--maroon);
   background: rgb(255 255 255 / 0.62);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .button-ink {
-  @apply rounded-full px-5 py-3 text-sm font-bold uppercase tracking-[0.18em];
+  @apply max-w-full rounded-full px-5 py-3 text-center text-sm font-bold uppercase tracking-[0.18em];
   color: #f4f1e8;
   background: linear-gradient(135deg, #1a1a1a, #380609);
   box-shadow: 0 14px 30px rgb(26 26 26 / 0.16);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .button-auth-box {
-  @apply rounded-md border px-5 py-3 text-sm font-bold uppercase tracking-[0.18em];
+  @apply max-w-full rounded-md border px-5 py-3 text-center text-sm font-bold uppercase tracking-[0.18em];
   border-color: rgb(122 26 32 / 0.55);
   color: #fffaf0;
   background: linear-gradient(135deg, #380609, #7a1a20 70%, #a92a35);
   box-shadow: 0 12px 24px rgb(56 6 9 / 0.22);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .button-admin-box {
-  @apply rounded-md border px-5 py-3 text-sm font-bold uppercase tracking-[0.18em];
+  @apply max-w-full rounded-md border px-5 py-3 text-center text-sm font-bold uppercase tracking-[0.18em];
   border-color: rgb(56 6 9 / 0.55);
   color: #fff2e8;
   background: linear-gradient(135deg, #4a0a0f, #380609 70%, #2d0508);
   box-shadow: 0 12px 24px rgb(56 6 9 / 0.2);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

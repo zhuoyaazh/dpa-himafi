@@ -28,11 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${montserrat.variable} ${cormorant.variable} antialiased`}
+        className={`${montserrat.variable} ${cormorant.variable} overflow-x-hidden antialiased`}
       >
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
           <MainNavbar />
-          <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+          <main className="mx-auto w-full max-w-6xl min-w-0 overflow-x-hidden px-4 py-8 sm:px-6 lg:px-8">
             {children}
           </main>
         </div>

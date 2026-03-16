@@ -71,7 +71,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-6">
+    <section className="mx-auto w-full max-w-3xl space-y-6 overflow-x-hidden">
       <header className="space-y-2">
         <p className="section-kicker">Voter Ledger</p>
         <h1 className="section-title">Cek Status</h1>
@@ -83,9 +83,9 @@ export default function ProfilePage() {
 
       <form
         onSubmit={onCheckStatus}
-        className="gold-card grid gap-4 p-6 text-sm"
+        className="gold-card grid gap-4 overflow-hidden p-4 text-sm sm:p-6"
       >
-        <label className="grid gap-1">
+        <label className="grid min-w-0 gap-1">
           <span className="font-semibold text-[--maroon]">Masukkan NIM</span>
           <input
             value={nim}
@@ -100,15 +100,15 @@ export default function ProfilePage() {
         <button
           type="submit"
           disabled={isLoading}
-          className="button-gold inline-flex w-fit items-center justify-center disabled:opacity-60"
+          className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
         >
           {isLoading ? "Mengecek..." : "Cek Status"}
         </button>
 
-        <p className="text-foreground/80">{message || "-"}</p>
+        <p className="break-words text-foreground/80">{message || "-"}</p>
 
         {status ? (
-          <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
+          <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
             <p>NIM: {status.nim}</p>
             <p>Angkatan: {status.angkatan ?? "-"}</p>
             <p>Sudah Vote: {status.sudahVote ? "Ya" : "Belum"}</p>

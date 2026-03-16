@@ -114,7 +114,7 @@ export default function LoginPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-6">
+    <section className="mx-auto w-full max-w-3xl space-y-6 overflow-x-hidden">
       <header className="space-y-2">
         <p className="section-kicker">Exclusive Entry</p>
         <h1 className="section-title">Login / Logout</h1>
@@ -124,13 +124,13 @@ export default function LoginPage() {
         </p>
       </header>
 
-      <div className="gold-card space-y-4 p-6 text-sm">
+      <div className="gold-card space-y-4 overflow-hidden p-4 text-sm sm:p-6">
         {isLoading ? <p>Mengecek status login...</p> : null}
 
         {!isLoading && !user ? (
           <form className="grid gap-3" onSubmit={onSubmit}>
-            <div className="grid gap-2">
-              <label className="grid gap-1">
+            <div className="grid min-w-0 gap-2">
+              <label className="grid min-w-0 gap-1">
                 <span className="font-semibold text-[--maroon]">NIM / Email ITB</span>
                 <input
                   type="text"
@@ -141,9 +141,9 @@ export default function LoginPage() {
                   className="input-luxury"
                 />
               </label>
-              <label className="grid gap-1">
+              <label className="grid min-w-0 gap-1">
                 <span className="font-semibold text-[--maroon]">Password</span>
-                <div className="relative">
+                <div className="relative min-w-0">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
@@ -165,10 +165,10 @@ export default function LoginPage() {
               </label>
               <div className="rounded-2xl border border-[--gold-soft] bg-white/60 p-4 text-foreground/75">
                 <p className="subtitle-strong">Format Login</p>
-                <p className="mt-2 text-sm">
+                <p className="mt-2 break-words text-sm">
                 Login menggunakan NIM atau email ITB
                 </p>
-                <p className="mt-1 text-sm">
+                <p className="mt-1 break-all text-sm">
                   (ex: 102xxxxx atau 102xxxxx@{PRIMARY_CAMPUS_EMAIL_DOMAIN})
                 </p>
                 <p className="mt-2 text-sm">
@@ -178,7 +178,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSigningIn}
-                className="button-gold inline-flex w-fit items-center justify-center disabled:opacity-60"
+                className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
               >
                 {isSigningIn ? "Memproses..." : "Login dengan NIM + Password"}
               </button>
@@ -189,7 +189,7 @@ export default function LoginPage() {
         {!isLoading && user ? (
           <div className="space-y-3 rounded-2xl border border-[--gold-soft] bg-white/60 p-4">
             <p>
-              Login sebagai: <span className="font-medium">{user.email}</span>
+              Login sebagai: <span className="break-all font-medium">{user.email}</span>
             </p>
             {!isCampusEmail(user.email ?? "") ? (
               <p className="text-foreground/80">
@@ -206,7 +206,7 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        <p className="text-foreground/80">Status: {message || "-"}</p>
+        <p className="break-words text-foreground/80">Status: {message || "-"}</p>
       </div>
     </section>
   );

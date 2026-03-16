@@ -16,15 +16,15 @@ export default function CalonPage() {
         {CANDIDATES.map((candidate) => (
           <article key={candidate.id} className="gold-card overflow-hidden p-6">
             <div className={`rounded-[1.75rem] bg-linear-to-br ${candidate.accent} p-6 text-[#fffaf0]`}>
-              <div className="flex items-start justify-between gap-4">
-                <div>
+              <div className="flex min-w-0 items-start justify-between gap-4">
+                <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-[0.35em] opacity-80">
                     Candidate {candidate.ballotNumber}
                   </p>
-                  <h2 className="font-display mt-3 text-4xl">{candidate.name}</h2>
-                  <p className="mt-2 text-sm opacity-85">{candidate.title}</p>
+                  <h2 className="font-display mt-3 break-words text-4xl">{candidate.name}</h2>
+                  <p className="mt-2 break-words text-sm opacity-85">{candidate.title}</p>
                 </div>
-                <span className="font-display text-5xl">{candidate.suit}</span>
+                <span className="font-display shrink-0 text-5xl">{candidate.suit}</span>
               </div>
             </div>
 
@@ -41,7 +41,7 @@ export default function CalonPage() {
                 <p className="subtitle-strong">Misi Utama</p>
                 <ul className="mt-2 space-y-2 leading-7">
                   {candidate.missions.map((mission) => (
-                    <li key={mission} className="rounded-2xl border border-[--gold-soft] bg-white/70 px-4 py-3">
+                    <li key={mission} className="rounded-2xl border border-[--gold-soft] bg-white/70 px-4 py-3 break-words">
                       {mission}
                     </li>
                   ))}
@@ -52,7 +52,7 @@ export default function CalonPage() {
         ))}
       </div>
 
-      <section className="gold-card p-6 md:p-8">
+      <section className="gold-card overflow-hidden p-6 md:p-8">
         <div className="space-y-2">
           <p className="section-kicker">Comparative Snapshot</p>
           <h2 className="font-display text-3xl text-[--maroon]">Perbandingan Ringkas</h2>
@@ -61,8 +61,8 @@ export default function CalonPage() {
           </p>
         </div>
 
-        <div className="mt-5 overflow-x-auto">
-          <table className="min-w-full text-left text-sm text-foreground/80">
+        <div className="mt-5 max-w-full overflow-x-auto">
+          <table className="min-w-full table-fixed text-left text-sm text-foreground/80">
             <thead>
               <tr className="border-b border-[--gold-soft] text-xs uppercase tracking-[0.18em] text-[--maroon]">
                 <th className="px-3 py-3">Kandidat</th>
@@ -73,11 +73,11 @@ export default function CalonPage() {
             <tbody>
               {CANDIDATES.map((candidate) => (
                 <tr key={`${candidate.id}-summary`} className="border-b border-[rgb(196_154_108/0.25)]">
-                  <td className="px-3 py-4 font-semibold text-[--maroon]">
+                  <td className="break-words px-3 py-4 font-semibold text-[--maroon]">
                     {candidate.ballotNumber}. {candidate.name}
                   </td>
-                  <td className="px-3 py-4">{candidate.title}</td>
-                  <td className="px-3 py-4">{candidate.tagline}</td>
+                  <td className="break-words px-3 py-4">{candidate.title}</td>
+                  <td className="break-words px-3 py-4">{candidate.tagline}</td>
                 </tr>
               ))}
             </tbody>

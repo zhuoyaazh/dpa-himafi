@@ -109,7 +109,7 @@ export default function ProfilPage() {
   }, [user, nimFromEmail]);
 
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-6">
+    <section className="mx-auto w-full max-w-3xl space-y-6 overflow-x-hidden">
       <header className="space-y-2">
         <p className="section-kicker">User Account</p>
         <h1 className="section-title">Profil User</h1>
@@ -119,11 +119,11 @@ export default function ProfilPage() {
       </header>
 
       {isCheckingAuth ? (
-        <div className="gold-card p-4 text-sm">Mengecek status login...</div>
+        <div className="gold-card overflow-hidden p-4 text-sm">Mengecek status login...</div>
       ) : null}
 
       {!isCheckingAuth && !user ? (
-        <div className="gold-card space-y-3 p-4 text-sm">
+        <div className="gold-card space-y-3 overflow-hidden p-4 text-sm">
           <p>Kamu harus login dulu untuk membuka profil user.</p>
           <Link href="/login" className="button-gold inline-flex w-fit">
             Login Sekarang
@@ -132,28 +132,28 @@ export default function ProfilPage() {
       ) : null}
 
       {user ? (
-        <div className="gold-card grid gap-4 p-6 text-sm">
-          <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
-            <p>Email Login: {user.email ?? "-"}</p>
-            <p>UID Auth: {user.uid}</p>
+        <div className="gold-card grid gap-4 overflow-hidden p-4 text-sm sm:p-6">
+          <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
+            <p>Email Login: <span className="break-all">{user.email ?? "-"}</span></p>
+            <p>UID Auth: <span className="break-all">{user.uid}</span></p>
             <p>NIM dari Email: {nimFromEmail || "-"}</p>
           </div>
 
           {isLoadingData ? <p>Memuat biodata...</p> : null}
 
           {biodata ? (
-            <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
+            <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
               <p>NIM: {biodata.nim ?? "-"}</p>
               <p>Angkatan: {biodata.angkatan ?? "-"}</p>
               <p>Status Hearing: {biodata.statusHearing ? "Peserta" : "Non-peserta"}</p>
               <p>Sudah Vote: {biodata.sudahVote ? "Ya" : "Belum"}</p>
               <p>Selfie Verifikasi: {biodata.selfieUrl ? "Tersimpan" : "Belum ada"}</p>
-              <p>Voter Email Tercatat: {biodata.voterEmail ?? "-"}</p>
-              <p>Voter UID Tercatat: {biodata.voterUid ?? "-"}</p>
+              <p>Voter Email Tercatat: <span className="break-all">{biodata.voterEmail ?? "-"}</span></p>
+              <p>Voter UID Tercatat: <span className="break-all">{biodata.voterUid ?? "-"}</span></p>
             </div>
           ) : null}
 
-          <p className="text-foreground/80">Status: {statusMessage || "-"}</p>
+          <p className="break-words text-foreground/80">Status: {statusMessage || "-"}</p>
         </div>
       ) : null}
     </section>
