@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isValidNim(nim) {
+      return nim is string && nim.size() >= 5 && nim.size() <= 20;
+    }
+
+    function hasCampusEmail() {
+      return request.auth != null &&
+        request.auth.token.email is string &&
+        request.auth.token.email.matches('^[^@]+@(student\\.itb\\.ac\\.id|mahasiswa\\.itb\\.ac\\.id|itb\\.ac\\.id)$');
+    }
+
+    function isAdmin() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.active == true;
+    }
+
+    match /users/{nim} {
+      allow read: if true;
+
+      allow create, update: if
+        hasCampusEmail() &&
+        isValidNim(nim) &&
+        request.resource.data.nim == nim &&
+        request.resource.data.sudahVote == true &&
+        request.resource.data.statusHearing is bool &&
+        request.resource.data.selfieUrl is string &&
+        request.resource.data.voterUid == request.auth.uid &&
+        request.resource.data.voterEmail == request.auth.token.email;
+
+      allow delete: if false;
+    }
+
+    match /suara_masuk/{voteId} {
+      allow create: if
+        hasCampusEmail() &&
+        request.resource.data.candidateId is string &&
+        request.resource.data.candidateId.size() > 0 &&
+        request.resource.data.bobotSuara in [1, 2];
+
+      allow read: if true;
+      allow update, delete: if false;
+    }
+
+    match /admin_users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /developer_audit_logs/{logId} {
+      allow create: if
+        request.auth != null &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.actorEmail == request.auth.token.email &&
+        request.resource.data.eventType is string;
+
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+  }
+}

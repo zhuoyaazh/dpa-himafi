@@ -1,36 +1,128 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DPA HIMAFI ITB Web
+
+Starter web utama DPA HIMAFI ITB dengan menu Home, Profil Calon, Profil User, Voting, Setting, dan Login/Logout.
+
+## Stack
+
+- Next.js (App Router)
+- Tailwind CSS
+- Firebase (Auth, Firestore, Storage)
 
 ## Getting Started
 
-First, run the development server:
+1) Install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2) Siapkan environment variable Firebase:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cp .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Lalu isi semua value Firebase Web App ke `.env.local`.
 
-## Learn More
+3) Jalankan development server:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Buka [http://localhost:3000](http://localhost:3000).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Struktur Route
 
-## Deploy on Vercel
+- `/` → Home DPA HIMAFI
+- `/calon` → Profil calon
+- `/profile` → Profil user
+- `/voting` → Halaman voting
+- `/setting` → Pengaturan
+- `/login` → Login/logout
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Konsep Data Voting (Anonim)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Koleksi `users`: `nim`, `selfieUrl`, `statusHearing`, `sudahVote`
+- Koleksi `suara_masuk`: `candidateId`, `bobotSuara`, `createdAt`
+
+Identitas pemilih dan suara dipisah agar panitia bisa verifikasi tanpa melihat pilihan suara per NIM.
+
+## Catatan Implementasi
+
+- Inisialisasi Firebase ada di `lib/firebase.ts`.
+- Helper submit voting ada di `lib/voting.ts` (`submitVote`).
+- Untuk production, validasi `sudahVote` dan bobot hearing sebaiknya dilakukan via server/API agar tidak bisa dimanipulasi dari client.
+
+## Contoh Rule Minimum (Firestore)
+
+Gunakan sebagai titik awal, lalu perketat sesuai mekanisme auth panitia:
+
+```txt
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{nim} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /suara_masuk/{voteId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update, delete: if false;
+    }
+  }
+}
+```
+
+## Rules Firebase untuk MVP (Voting Wajib Login)
+
+Project ini sudah disiapkan dengan file rules berikut:
+
+- `firestore.rules`
+- `storage.rules`
+
+Cara pakai cepat (via Firebase Console):
+
+1) Buka **Firestore Database → Rules** lalu paste isi `firestore.rules`.
+2) Buka **Storage → Rules** lalu paste isi `storage.rules`.
+3) Klik **Publish** di masing-masing halaman.
+
+Catatan:
+
+- Submit voting sekarang mensyaratkan `request.auth != null` (user harus login).
+- Submit voting hanya menerima email kampus terverifikasi (`@student.itb.ac.id`, `@mahasiswa.itb.ac.id`, atau `@itb.ac.id`).
+- NIM pada form voting harus sama dengan bagian awal email kampus.
+- Read data profil di `/profile` tetap bisa tanpa login.
+- Ini **belum final untuk production**. Setelah auth panitia/user aktif penuh, rules tetap perlu diperketat lagi.
+
+Catatan implementasi MVP saat ini:
+
+- Login `NIM + Token` memakai Firebase Auth Email/Password.
+- Untuk alur ini, rules tidak mewajibkan `email_verified == true` agar upload selfie dan submit vote tidak tertolak.
+
+## Setup Firebase Auth (NIM + Password)
+
+1) Buka **Firebase Console → Authentication → Sign-in method**.
+2) Aktifkan provider **Email/Password**.
+3) Di **Authentication → Settings → Authorized domains**, pastikan `localhost` sudah terdaftar.
+4) Buat akun user pemilih (manual/import) dengan format email kampus berbasis NIM, contoh: `10224000@mahasiswa.itb.ac.id`.
+5) Gunakan halaman `/login` untuk masuk pakai `NIM + Password`.
+
+Catatan paket gratis (Spark):
+
+- Email/Password bisa dipakai di Spark.
+- Error `auth/operation-not-allowed` biasanya berarti provider belum diaktifkan di langkah 2.
+
+## Fitur yang Sudah Aktif
+
+- Form voting di `/voting` (NIM, kandidat, checkbox hearing, upload selfie)
+- Gate login di `/voting` (wajib login sebelum submit)
+- Login/logout NIM + Password di `/login`
+- Submit ke Firebase via `submitVote()` dengan anti double-vote sederhana (`sudahVote`)
+- Cek status user di `/profile` berdasarkan NIM
+
+## Next Step
+
+- finalisasi daftar calon dari data riil
+- buat halaman admin terpisah untuk rekap hasil
