@@ -128,7 +128,11 @@ export default function HasilPage() {
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
-        {sortedSummary.map((candidate, index) => (
+        {sortedSummary.map((candidate, index) => {
+          const fillWidth =
+            candidate.percentage <= 0 ? 0 : Math.min(Math.max(candidate.percentage, 4), 100);
+
+          return (
           <article key={candidate.id} className="gold-card overflow-hidden p-6">
             <div className={`rounded-3xl bg-gradient-to-br ${candidate.accent} p-5 text-[#fffaf0]`}>
               <div className="flex min-w-0 items-start justify-between gap-3">
@@ -159,14 +163,18 @@ export default function HasilPage() {
                 </div>
                 <div className="h-3 overflow-hidden rounded-full bg-[rgb(196_154_108/0.18)]">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-[--maroon] to-[--gold]"
-                    style={{ width: `${Math.max(candidate.percentage, 4)}%` }}
+                    className="h-full rounded-full transition-[width] duration-500 ease-out"
+                    style={{
+                      width: `${fillWidth}%`,
+                      background: "linear-gradient(90deg, var(--maroon), var(--gold))",
+                    }}
                   />
                 </div>
               </div>
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
