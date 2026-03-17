@@ -134,9 +134,9 @@ export default function ProfilPage() {
       {user ? (
         <div className="gold-card grid gap-4 overflow-hidden p-4 text-sm sm:p-6">
           <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
-            <p>Email Login: <span className="break-all">{user.email ?? "-"}</span></p>
-            <p>UID Auth: <span className="break-all">{user.uid}</span></p>
-            <p>NIM dari Email: {nimFromEmail || "-"}</p>
+            <p>Email Login: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom">{user.email ?? "-"}</span></p>
+            <p>UID Auth: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom">{user.uid}</span></p>
+            <p>NIM dari Email: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom">{nimFromEmail || "-"}</span></p>
           </div>
 
           {isLoadingData ? <p>Memuat biodata...</p> : null}
@@ -148,8 +148,8 @@ export default function ProfilPage() {
               <p>Status Hearing: {biodata.statusHearing ? "Hadir" : "Tidak hadir"}</p>
               <p>Sudah Vote: {biodata.sudahVote ? "Ya" : "Belum"}</p>
               <p>Selfie Verifikasi: {biodata.selfieUrl ? "Tersimpan" : "Belum ada"}</p>
-              <p>Voter Email Tercatat: <span className="break-all">{biodata.voterEmail ?? "-"}</span></p>
-              <p>Voter UID Tercatat: <span className="break-all">{biodata.voterUid ?? "-"}</span></p>
+              <p>Voter Email Tercatat: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom">{biodata.voterEmail ?? "-"}</span></p>
+              <p>Voter UID Tercatat: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom">{biodata.voterUid ?? "-"}</span></p>
             </div>
           ) : null}
 

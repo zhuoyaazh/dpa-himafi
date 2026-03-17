@@ -413,9 +413,9 @@ export default function HearingPage() {
       {user ? (
         <form onSubmit={onSubmit} className="gold-card grid gap-4 overflow-hidden p-4 text-sm sm:p-6">
           <div className="rounded-2xl border border-[--gold-soft] bg-white/65 p-4 text-foreground/80">
-            Login sebagai: <span className="break-all font-semibold">{user.email}</span>
+            Login sebagai: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-semibold">{user.email}</span>
             <br />
-            NIM terdeteksi: <span className="font-semibold">{nimFromEmail || "-"}</span>
+            NIM terdeteksi: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-semibold">{nimFromEmail || "-"}</span>
             {settings?.sessionName ? (
               <>
                 <br />

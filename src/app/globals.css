@@ -72,7 +72,7 @@ select {
 }
 
 .section-title {
-  @apply text-4xl md:text-5xl;
+  @apply text-4xl font-bold md:text-5xl;
   font-family: var(--font-display);
   color: var(--maroon);
 }

@@ -765,12 +765,12 @@ export default function AdminPage() {
 
         {user ? (
           <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/60 p-4">
-            <p>Email login: <span className="break-all font-semibold">{user.email}</span></p>
-            <p>UID login: <span className="break-all font-semibold">{user.uid}</span></p>
+            <p>Email login: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-semibold">{user.email}</span></p>
+            <p>UID login: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-semibold">{user.uid}</span></p>
             {!isAdmin ? (
               <p className="mt-2 text-sm text-foreground/75">
                 Akses admin hanya untuk orang DPA yang didaftarkan manual di collection <span className="font-semibold">admin_users</span>
-                {' '}dengan ID <span className="break-all font-semibold">{user.uid}</span> dan field <span className="font-semibold">active: true</span>.
+                {' '}dengan ID <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-semibold">{user.uid}</span> dan field <span className="font-semibold">active: true</span>.
               </p>
             ) : null}
           </div>
@@ -796,8 +796,8 @@ export default function AdminPage() {
                         : "Waktu tidak tersedia"}
                     </p>
                   </div>
-                  <p className="mt-2 wrap-break-word">Actor: <span className="break-all font-semibold">{log.actorEmail ?? "-"}</span></p>
-                  <p className="wrap-break-word">UID: <span className="break-all font-semibold">{log.actorUid ?? "-"}</span></p>
+                  <p className="mt-2 wrap-break-word">Actor: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-semibold">{log.actorEmail ?? "-"}</span></p>
+                  <p className="wrap-break-word">UID: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-semibold">{log.actorUid ?? "-"}</span></p>
                   <p className="wrap-break-word">
                     Metadata: panjang password baru {log.metadata?.passwordLength ?? "-"} karakter
                   </p>

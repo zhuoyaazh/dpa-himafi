@@ -168,7 +168,7 @@ export default function LoginPage() {
                 <p className="mt-2 break-words text-sm">
                 Login menggunakan NIM atau email ITB
                 </p>
-                <p className="mt-1 break-all text-sm">
+                <p className="mt-1 overflow-x-auto whitespace-nowrap text-sm">
                   (ex: 102xxxxx atau 102xxxxx@{PRIMARY_CAMPUS_EMAIL_DOMAIN})
                 </p>
                 <p className="mt-2 text-sm">
@@ -189,7 +189,7 @@ export default function LoginPage() {
         {!isLoading && user ? (
           <div className="space-y-3 rounded-2xl border border-[--gold-soft] bg-white/60 p-4">
             <p>
-              Login sebagai: <span className="break-all font-medium">{user.email}</span>
+              Login sebagai: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-medium">{user.email}</span>
             </p>
             {!isCampusEmail(user.email ?? "") ? (
               <p className="text-foreground/80">

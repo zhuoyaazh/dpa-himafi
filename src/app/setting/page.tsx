@@ -138,7 +138,7 @@ export default function SettingPage() {
         {user ? (
           <form className="grid gap-4" onSubmit={onSubmit}>
             <div className="rounded-xl border border-[--gold-soft] bg-white/60 p-4 text-sm text-foreground/80">
-              Login sebagai <span className="break-all font-semibold">{user.email}</span>
+              Login sebagai <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-semibold">{user.email}</span>
             </div>
 
             <label className="grid min-w-0 gap-1">
