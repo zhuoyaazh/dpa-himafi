@@ -12,7 +12,6 @@ import { getVoterIdentityError, normalizeNim } from "@/lib/voter-identity";
 type SubmitVotePayload = {
   nim: string;
   candidateId: string;
-  hearingWeight: 1 | 2;
   selfieFile?: File;
   selfieUrl?: string;
 };
@@ -38,6 +37,8 @@ export async function submitVote(payload: SubmitVotePayload) {
   const userRef = doc(db, "users", sanitizedNim);
   const userSnapshot = await getDoc(userRef);
   const existingData = userSnapshot.data();
+  const hearingWeight: 1 | 2 =
+    Boolean(existingData?.statusHearing ?? existingData?.status_hearing) ? 2 : 1;
 
   if (existingData?.sudahVote || existingData?.sudah_vote) {
     throw new Error("NIM ini sudah melakukan voting sebelumnya.");
@@ -74,7 +75,7 @@ export async function submitVote(payload: SubmitVotePayload) {
       {
         nim: sanitizedNim,
         selfieUrl,
-        statusHearing: payload.hearingWeight === 2,
+        statusHearing: hearingWeight === 2,
         sudahVote: true,
         voterUid: currentUser.uid,
         voterEmail: currentUser.email,
@@ -86,7 +87,7 @@ export async function submitVote(payload: SubmitVotePayload) {
 
     transaction.set(voteRef, {
       candidateId: payload.candidateId,
-      bobotSuara: payload.hearingWeight,
+      bobotSuara: hearingWeight,
       createdAt: serverTimestamp(),
     });
   });

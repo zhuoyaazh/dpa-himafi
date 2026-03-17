@@ -10,6 +10,7 @@ const primaryMenuItems = [
   { href: "/", label: "Dashboard" },
   { href: "/calon", label: "Profil Calon" },
   { href: "/hasil", label: "Hasil Voting" },
+  { href: "/hearing", label: "Presensi Hearing" },
   { href: "/voting", label: "Voting" },
   { href: "/profile", label: "Cek Status" },
   { href: "/profil", label: "Profil User" },
@@ -74,8 +75,22 @@ export function MainNavbar() {
         <nav className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <Link href="/" className="font-display break-words text-2xl tracking-wide text-[--maroon]">
-                DPA HIMAFI ITB
+              <Link href="/" className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/LOGO_DPA_FIX.png"
+                  alt="Logo DPA"
+                  className="h-10 w-10 shrink-0 object-contain md:h-12 md:w-12"
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/LOGO_HIMAFI_FIX.png"
+                  alt="Logo HIMAFI"
+                  className="h-10 w-10 shrink-0 object-contain brightness-90 contrast-110 md:h-12 md:w-12"
+                />
+                <span className="font-display wrap-break-word text-2xl font-bold tracking-wide text-[--maroon]">
+                  DPA HIMAFI ITB
+                </span>
               </Link>
             </div>
 
@@ -86,7 +101,7 @@ export function MainNavbar() {
               aria-expanded={isMenuOpen}
               aria-label="Toggle menu"
             >
-              {isMenuOpen ? "Close" : "Menu"}
+              {isMenuOpen ? "✕" : "☰"}
             </button>
           </div>
         </nav>
@@ -131,7 +146,7 @@ export function MainNavbar() {
                   onClick={closeMenu}
                   className="flex w-full min-w-0 items-center justify-between gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 px-4 py-3 font-semibold text-[--maroon]"
                 >
-                  <span className="min-w-0 break-words">{item.label}</span>
+                  <span className="min-w-0 wrap-break-word">{item.label}</span>
                   <span aria-hidden="true" className="shrink-0">→</span>
                 </Link>
               </li>

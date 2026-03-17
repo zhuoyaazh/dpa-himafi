@@ -145,7 +145,7 @@ export default function ProfilPage() {
             <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
               <p>NIM: {biodata.nim ?? "-"}</p>
               <p>Angkatan: {biodata.angkatan ?? "-"}</p>
-              <p>Status Hearing: {biodata.statusHearing ? "Peserta" : "Non-peserta"}</p>
+              <p>Status Hearing: {biodata.statusHearing ? "Hadir" : "Tidak hadir"}</p>
               <p>Sudah Vote: {biodata.sudahVote ? "Ya" : "Belum"}</p>
               <p>Selfie Verifikasi: {biodata.selfieUrl ? "Tersimpan" : "Belum ada"}</p>
               <p>Voter Email Tercatat: <span className="break-all">{biodata.voterEmail ?? "-"}</span></p>

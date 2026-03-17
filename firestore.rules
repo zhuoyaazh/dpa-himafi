@@ -17,6 +17,12 @@ service cloud.firestore {
         get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).data.active == true;
     }
 
+    function isOwnerNim(nim) {
+      return request.auth != null &&
+        hasCampusEmail() &&
+        request.auth.token.email.matches('^' + nim + '@(student\\.itb\\.ac\\.id|mahasiswa\\.itb\\.ac\\.id|itb\\.ac\\.id)$');
+    }
+
     match /users/{nim} {
       allow read: if true;
 
@@ -58,6 +64,35 @@ service cloud.firestore {
 
       allow read: if isAdmin();
       allow update, delete: if false;
+    }
+
+    match /hearing_settings/{settingId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /hearing_sessions/{sessionId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /hearing_attendance/{nim} {
+      allow read: if isAdmin() || isOwnerNim(nim);
+
+      allow create, update: if
+        isOwnerNim(nim) &&
+        request.resource.data.nim == nim &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.statusHearing is bool &&
+        request.resource.data.status_hearing is bool;
+
+      allow delete: if false;
+    }
+
+    match /site_announcements/{announcementId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
   }
 }

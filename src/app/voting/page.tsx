@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { submitVote } from "@/lib/voting";
 import { getFirebaseAuth } from "@/lib/firebase";
@@ -111,7 +111,6 @@ export default function VotingPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [nim, setNim] = useState("");
   const [candidateId, setCandidateId] = useState(CANDIDATES[0].id);
-  const [isHearingAttendee, setIsHearingAttendee] = useState(false);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -125,11 +124,6 @@ export default function VotingPage() {
 
     return unsubscribe;
   }, []);
-
-  const hearingWeight = useMemo<1 | 2>(
-    () => (isHearingAttendee ? 2 : 1),
-    [isHearingAttendee],
-  );
 
   const uploadFotoKeCloudinary = async (fileFoto: File) => {
     const formData = new FormData();
@@ -240,7 +234,6 @@ export default function VotingPage() {
       await submitVote({
         nim: sanitizedNim,
         candidateId,
-        hearingWeight,
         selfieFile: optimizedSelfieFile,
         selfieUrl,
       });
@@ -322,16 +315,6 @@ export default function VotingPage() {
               </option>
             ))}
           </select>
-        </label>
-
-        <label className="flex min-w-0 items-start gap-3 rounded-2xl border border-[--gold-soft] bg-white/60 px-4 py-3">
-          <input
-            type="checkbox"
-            checked={isHearingAttendee}
-            onChange={(event) => setIsHearingAttendee(event.target.checked)}
-            className="mt-1 shrink-0"
-          />
-          <span className="min-w-0 break-words">Peserta hearing (bobot suara 2)</span>
         </label>
 
         <label className="grid min-w-0 gap-1">

@@ -36,10 +36,13 @@ Buka [http://localhost:3000](http://localhost:3000).
 
 - `/` → Home DPA HIMAFI
 - `/calon` → Profil calon
-- `/profile` → Profil user
+- `/profile` → Cek status pemilih
+- `/profil` → Profil user (akun login)
+- `/hearing` → Presensi hearing (check-in/check-out)
 - `/voting` → Halaman voting
 - `/setting` → Pengaturan
 - `/login` → Login/logout
+- `/admin` → Panel admin
 
 ## Konsep Data Voting (Anonim)
 
@@ -87,6 +90,57 @@ Cara pakai cepat (via Firebase Console):
 1) Buka **Firestore Database → Rules** lalu paste isi `firestore.rules`.
 2) Buka **Storage → Rules** lalu paste isi `storage.rules`.
 3) Klik **Publish** di masing-masing halaman.
+
+### Publish Rules Setelah Fitur Presensi Hearing
+
+Setelah update terbaru, kamu **wajib publish ulang** Firestore Rules agar fitur ini aktif:
+
+- `hearing_settings/current` (admin set aktif/nonaktif, token, jadwal)
+- `hearing_attendance/{nim}` (peserta kirim check-in/check-out + bukti)
+
+Langkah cepat:
+
+1) Buka **Firestore Database → Rules**.
+2) Paste isi file `firestore.rules` terbaru dari project ini.
+3) Klik **Publish**.
+4) Tunggu status publish sukses.
+
+Catatan: tanpa publish ulang rules, halaman `/hearing` atau simpan pengaturan di `/admin` bisa kena `permission-denied`.
+
+## Checklist Uji Cepat Presensi Hearing
+
+### A. Uji sebagai Admin
+
+1) Login akun admin (akun yang ada di `admin_users/{uid}` dengan `active: true`).
+2) Buka `/admin`.
+3) Isi:
+  - toggle `Presensi hearing aktif`
+  - `Token Check-in`
+  - `Token Check-out`
+  - window waktu check-in/check-out
+4) Klik **Simpan Pengaturan Presensi**.
+5) Pastikan muncul status berhasil.
+
+### B. Uji sebagai Peserta
+
+1) Login akun peserta.
+2) Buka `/hearing`.
+3) Pilih **Check-in Awal**, isi token check-in yang benar, lalu **Upload Bukti Kehadiran** dan submit.
+4) Ulangi untuk **Check-out Akhir** dengan token check-out.
+5) Cek dokumen `hearing_attendance/{nim}` di Firestore, pastikan field ini terisi:
+  - `checkInAt`, `checkOutAt`
+  - `checkInProofUrl`, `checkOutProofUrl`
+  - `classification` (`awal_akhir`)
+  - `statusHearing` dan `status_hearing` menjadi `true`
+
+### C. Uji Skenario Gagal
+
+- Token salah → harus ditolak.
+- Presensi nonaktif → harus ditolak.
+- Di luar window waktu → harus ditolak.
+- Submit check-in/check-out dua kali → harus ditolak.
+
+Jika semua lolos, fitur presensi hearing siap dipakai operasional.
 
 Catatan:
 

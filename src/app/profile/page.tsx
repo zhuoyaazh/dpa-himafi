@@ -112,7 +112,7 @@ export default function ProfilePage() {
             <p>NIM: {status.nim}</p>
             <p>Angkatan: {status.angkatan ?? "-"}</p>
             <p>Sudah Vote: {status.sudahVote ? "Ya" : "Belum"}</p>
-            <p>Status Hearing: {status.statusHearing ? "Peserta" : "Non-peserta"}</p>
+            <p>Status Hearing: {status.statusHearing ? "Hadir" : "Tidak hadir"}</p>
             <p>Bobot Suara: {status.statusHearing ? 2 : 1}</p>
             <p>
               Selfie Verifikasi: {status.selfieUrl ? "Tersimpan" : "Belum ada"}
