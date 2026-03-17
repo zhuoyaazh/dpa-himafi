@@ -114,8 +114,8 @@ export default function LoginPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-6 overflow-x-hidden">
-      <header className="space-y-2">
+    <section className="mx-auto w-full min-w-0 max-w-3xl space-y-6 overflow-x-hidden px-1">
+      <header className="min-w-0 space-y-2">
         <p className="section-kicker">Exclusive Entry</p>
         <h1 className="section-title">Login / Logout</h1>
         <p className="max-w-2xl text-sm text-foreground/75">
@@ -124,12 +124,12 @@ export default function LoginPage() {
         </p>
       </header>
 
-      <div className="gold-card space-y-4 overflow-hidden p-4 text-sm sm:p-6">
+      <div className="gold-card min-w-0 space-y-4 overflow-hidden p-4 text-sm sm:p-6">
         {isLoading ? <p>Mengecek status login...</p> : null}
 
         {!isLoading && !user ? (
-          <form className="grid gap-3" onSubmit={onSubmit}>
-            <div className="grid min-w-0 gap-2">
+          <form className="grid min-w-0 w-full gap-3" onSubmit={onSubmit}>
+            <div className="grid min-w-0 w-full gap-2">
               <label className="grid min-w-0 gap-1">
                 <span className="font-semibold text-[--maroon]">NIM / Email ITB</span>
                 <input
@@ -143,7 +143,7 @@ export default function LoginPage() {
               </label>
               <label className="grid min-w-0 gap-1">
                 <span className="font-semibold text-[--maroon]">Password</span>
-                <div className="relative min-w-0">
+                <div className="relative min-w-0 w-full">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
@@ -163,14 +163,16 @@ export default function LoginPage() {
                   </button>
                 </div>
               </label>
-              <div className="rounded-2xl border border-[--gold-soft] bg-white/60 p-4 text-foreground/75">
+              <div className="min-w-0 overflow-hidden rounded-2xl border border-[--gold-soft] bg-white/60 p-4 text-foreground/75">
                 <p className="subtitle-strong">Format Login</p>
                 <p className="mt-2 break-words text-sm">
                 Login menggunakan NIM atau email ITB
                 </p>
-                <p className="mt-1 overflow-x-auto whitespace-nowrap text-sm">
-                  (ex: 102xxxxx atau 102xxxxx@{PRIMARY_CAMPUS_EMAIL_DOMAIN})
-                </p>
+                <div className="mt-1 w-full min-w-0 overflow-x-auto">
+                  <p className="whitespace-nowrap text-sm">
+                    (ex: 102xxxxx atau 102xxxxx@{PRIMARY_CAMPUS_EMAIL_DOMAIN})
+                  </p>
+                </div>
                 <p className="mt-2 text-sm">
                   Jika tetap gagal, cek apakah akun ini sudah ada di Firebase Authentication.
                 </p>
@@ -187,10 +189,15 @@ export default function LoginPage() {
         ) : null}
 
         {!isLoading && user ? (
-          <div className="space-y-3 rounded-2xl border border-[--gold-soft] bg-white/60 p-4">
-            <p>
-              Login sebagai: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom font-medium">{user.email}</span>
-            </p>
+          <div className="min-w-0 space-y-3 overflow-hidden rounded-2xl border border-[--gold-soft] bg-white/60 p-4">
+            <div className="min-w-0">
+              Login sebagai:{" "}
+              <span className="inline-block max-w-full min-w-0 align-bottom">
+                <span className="block w-full max-w-full overflow-x-auto whitespace-nowrap font-medium">
+                  {user.email}
+                </span>
+              </span>
+            </div>
             {!isCampusEmail(user.email ?? "") ? (
               <p className="text-foreground/80">
                 Email ini bukan domain kampus ITB. Voting akan ditolak.
