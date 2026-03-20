@@ -279,6 +279,15 @@ export default function VotingPage() {
         </div>
       ) : null}
 
+      <article className="gold-card overflow-hidden p-4 text-sm sm:p-6">
+        <p className="subtitle-strong">Panduan Voting</p>
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-foreground/80">
+          <li>Pastikan sudah login dengan email kampus ITB yang valid.</li>
+          <li>Isi NIM sesuai awal email login, lalu pilih kandidat.</li>
+          <li>Upload selfie verifikasi dan klik Submit Voting satu kali.</li>
+        </ol>
+      </article>
+
       {user ? (
         <form
           onSubmit={onSubmit}

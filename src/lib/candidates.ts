@@ -8,6 +8,8 @@ export type CandidateProfile = {
   missions: string[];
   accent: string;
   suit: string;
+  draftUrl?: string;
+  pptUrl?: string;
 };
 
 export const CANDIDATES: CandidateProfile[] = [
@@ -26,6 +28,8 @@ export const CANDIDATES: CandidateProfile[] = [
     ],
     accent: "from-[#380609] via-[#5f0d12] to-[#D4AF37]",
     suit: "♠",
+    draftUrl: "",
+    pptUrl: "",
   },
   {
     id: "calon-2",
@@ -42,6 +46,8 @@ export const CANDIDATES: CandidateProfile[] = [
     ],
     accent: "from-[#1A1A1A] via-[#2b2b2b] to-[#C49A6C]",
     suit: "♦",
+    draftUrl: "",
+    pptUrl: "",
   },
 ];
 

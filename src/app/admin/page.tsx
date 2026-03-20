@@ -61,6 +61,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
+  const [isSavingResultsVisibility, setIsSavingResultsVisibility] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [hearingSessions, setHearingSessions] = useState<HearingSessionSummary[]>([]);
@@ -71,6 +72,7 @@ export default function AdminPage() {
   const [announcementHistory, setAnnouncementHistory] = useState<AnnouncementHistory[]>([]);
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState("");
   const [deletingAnnouncementId, setDeletingAnnouncementId] = useState("");
+  const [showCandidateBreakdownPublic, setShowCandidateBreakdownPublic] = useState(false);
   const [hearingSettings, setHearingSettings] = useState<HearingSettingsForm>({
     isActive: false,
     presensiAwalAktif: true,
@@ -191,6 +193,18 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadResultsVisibility = useCallback(async () => {
+    const snapshot = await getDoc(doc(db, "site_settings", "results_visibility"));
+
+    if (!snapshot.exists()) {
+      setShowCandidateBreakdownPublic(false);
+      return;
+    }
+
+    const data = snapshot.data() as { showCandidateBreakdownPublic?: boolean };
+    setShowCandidateBreakdownPublic(Boolean(data.showCandidateBreakdownPublic));
+  }, []);
+
   useEffect(() => {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -235,7 +249,11 @@ export default function AdminPage() {
         setLogs(snapshot.docs.map((log) => log.data() as AuditLog));
         setTotalVotes(voteRows.length);
         setTotalVoteWeight(voteWeight);
-        await Promise.all([loadHearingSettingsAndHistory(), loadAnnouncementHistory()]);
+        await Promise.all([
+          loadHearingSettingsAndHistory(),
+          loadAnnouncementHistory(),
+          loadResultsVisibility(),
+        ]);
         setMessage("Audit log berhasil dimuat.");
       } catch {
         setMessage("Gagal memuat panel admin.");
@@ -245,7 +263,38 @@ export default function AdminPage() {
     });
 
     return unsubscribe;
-  }, [loadAnnouncementHistory, loadHearingSettingsAndHistory]);
+  }, [loadAnnouncementHistory, loadHearingSettingsAndHistory, loadResultsVisibility]);
+
+  async function onToggleResultsVisibility(nextValue: boolean) {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa mengatur visibilitas hasil voting.");
+      return;
+    }
+
+    try {
+      setIsSavingResultsVisibility(true);
+
+      await setDoc(
+        doc(db, "site_settings", "results_visibility"),
+        {
+          showCandidateBreakdownPublic: nextValue,
+          updatedAt: serverTimestamp(),
+          updatedByUid: user.uid,
+          updatedByEmail: user.email,
+        },
+        { merge: true },
+      );
+
+      setShowCandidateBreakdownPublic(nextValue);
+      setMessage(nextValue
+        ? "Live count per calon kini tampil untuk publik."
+        : "Live count per calon kini disembunyikan untuk publik.");
+    } catch {
+      setMessage("Gagal mengubah visibilitas hasil voting.");
+    } finally {
+      setIsSavingResultsVisibility(false);
+    }
+  }
 
   async function onSaveAnnouncement() {
     if (!user || !isAdmin) {
@@ -465,6 +514,45 @@ export default function AdminPage() {
               <p className="font-display mt-2 text-3xl text-[--maroon]">{totalVoteWeight}</p>
             </div>
           </div>
+        ) : null}
+
+        {isAdmin ? (
+          <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+            <div className="space-y-2">
+              <p className="subtitle-strong">Visibilitas Hasil Voting</p>
+              <p className="text-sm text-foreground/75">
+                Atur apakah rincian suara per calon (live count) ditampilkan ke publik atau hanya admin.
+              </p>
+            </div>
+
+            <div className="mt-4 grid gap-3 rounded-2xl border border-[--gold-soft] bg-[rgb(255_250_240/0.9)] p-4">
+              <p className="text-sm">
+                Status saat ini:{" "}
+                <span className="font-semibold text-[--maroon]">
+                  {showCandidateBreakdownPublic ? "Publik Bisa Lihat" : "Hanya Admin"}
+                </span>
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onToggleResultsVisibility(false)}
+                  disabled={isSavingResultsVisibility || !showCandidateBreakdownPublic}
+                  className="button-outline inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  Hide untuk Publik
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onToggleResultsVisibility(true)}
+                  disabled={isSavingResultsVisibility || showCandidateBreakdownPublic}
+                  className="button-gold inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  Show ke Publik
+                </button>
+              </div>
+            </div>
+          </section>
         ) : null}
 
         {isAdmin ? (

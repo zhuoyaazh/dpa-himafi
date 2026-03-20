@@ -12,7 +12,7 @@ export default function CalonPage() {
         </p>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid gap-5 lg:grid-cols-2">
         {CANDIDATES.map((candidate) => (
           <article key={candidate.id} className="gold-card overflow-hidden p-6">
             <div className={`rounded-[1.75rem] bg-linear-to-br ${candidate.accent} p-6 text-[#fffaf0]`}>
@@ -46,6 +46,41 @@ export default function CalonPage() {
                     </li>
                   ))}
                 </ul>
+              </div>
+
+              <div>
+                <p className="subtitle-strong">Dokumen Calon</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {candidate.draftUrl ? (
+                    <a
+                      href={candidate.draftUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="button-outline inline-flex w-full items-center justify-center"
+                    >
+                      Lihat Draft
+                    </a>
+                  ) : (
+                    <span className="inline-flex w-full items-center justify-center rounded-full border border-[--gold-soft] bg-white/50 px-5 py-3 text-xs font-semibold text-foreground/55 whitespace-nowrap">
+                      Draft Belum Tersedia
+                    </span>
+                  )}
+
+                  {candidate.pptUrl ? (
+                    <a
+                      href={candidate.pptUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="button-outline inline-flex w-full items-center justify-center"
+                    >
+                      Lihat PPT
+                    </a>
+                  ) : (
+                    <span className="inline-flex w-full items-center justify-center rounded-full border border-[--gold-soft] bg-white/50 px-5 py-3 text-xs font-semibold text-foreground/55 whitespace-nowrap">
+                      PPT Belum Tersedia
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </article>

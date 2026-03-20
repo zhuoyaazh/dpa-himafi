@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CANDIDATES } from "@/lib/candidates";
+import { getFirebaseAuth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 type ImportantInfo = {
   title: string;
@@ -20,6 +22,8 @@ type VoteRow = {
 export default function Home() {
   const [importantInfo, setImportantInfo] = useState<ImportantInfo | null>(null);
   const [votes, setVotes] = useState<VoteRow[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showCandidateBreakdownPublic, setShowCandidateBreakdownPublic] = useState(false);
 
   useEffect(() => {
     async function loadImportantInfo() {
@@ -63,7 +67,43 @@ export default function Home() {
     }
 
     void loadVoteSummary();
+
+    async function loadResultsVisibility() {
+      try {
+        const snapshot = await getDoc(doc(db, "site_settings", "results_visibility"));
+        if (!snapshot.exists()) {
+          setShowCandidateBreakdownPublic(false);
+          return;
+        }
+
+        const data = snapshot.data() as { showCandidateBreakdownPublic?: boolean };
+        setShowCandidateBreakdownPublic(Boolean(data.showCandidateBreakdownPublic));
+      } catch {
+        setShowCandidateBreakdownPublic(false);
+      }
+    }
+
+    void loadResultsVisibility();
+
+    const auth = getFirebaseAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser) {
+        setIsAdmin(false);
+        return;
+      }
+
+      try {
+        const adminDoc = await getDoc(doc(db, "admin_users", currentUser.uid));
+        setIsAdmin(adminDoc.exists() && adminDoc.data().active === true);
+      } catch {
+        setIsAdmin(false);
+      }
+    });
+
+    return unsubscribe;
   }, []);
+
+  const canViewCandidateBreakdown = isAdmin || showCandidateBreakdownPublic;
 
   const voteSummary = useMemo(() => {
     const totalWeight = votes.reduce(
@@ -138,36 +178,55 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="mt-5 space-y-3">
-          {voteSummary.map((candidate, index) => {
-            const fill = candidate.percentage <= 0 ? 0 : Math.min(Math.max(candidate.percentage, 4), 100);
+        {canViewCandidateBreakdown ? (
+          <div className="mt-5 space-y-3">
+            {voteSummary.map((candidate, index) => {
+              const fill = candidate.percentage <= 0 ? 0 : Math.min(Math.max(candidate.percentage, 4), 100);
 
-            return (
-              <div key={candidate.id}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="font-semibold text-[--maroon]">
-                    {candidate.ballotNumber}. {candidate.name}
-                  </span>
-                  <span className="text-foreground/70">
-                    {candidate.percentage.toFixed(1)}% · {candidate.weightedVotes} bobot
-                  </span>
+              return (
+                <div key={candidate.id}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[--maroon]">
+                      {candidate.ballotNumber}. {candidate.name}
+                    </span>
+                    <span className="text-foreground/70">
+                      {candidate.percentage.toFixed(1)}% · {candidate.weightedVotes} bobot
+                    </span>
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-[rgb(196_154_108/0.18)]">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-500 ease-out"
+                      style={{
+                        width: `${fill}%`,
+                        background:
+                          index === 0
+                            ? "linear-gradient(90deg, var(--maroon), var(--gold))"
+                            : "linear-gradient(90deg, var(--ink), var(--gold))",
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-[rgb(196_154_108/0.18)]">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-500 ease-out"
-                    style={{
-                      width: `${fill}%`,
-                      background:
-                        index === 0
-                          ? "linear-gradient(90deg, var(--maroon), var(--gold))"
-                          : "linear-gradient(90deg, var(--ink), var(--gold))",
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-foreground/70">
+            Live count per calon disembunyikan sementara untuk menjaga netralitas pemilihan.
+          </p>
+        )}
+      </article>
+
+      <article className="gold-card overflow-hidden p-6">
+        <p className="subtitle-strong">Panduan Voting Singkat</p>
+        <h2 className="mt-2 font-display text-3xl text-[--maroon]">Cara Voting</h2>
+        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-foreground/80">
+          <li>Login dengan akun kampus ITB (NIM/email) di halaman Login.</li>
+          <li>Buka Profil Calon untuk membaca visi-misi, draft, dan PPT kandidat.</li>
+          <li>Masuk ke halaman Voting, pilih kandidat, upload selfie verifikasi, lalu submit.</li>
+        </ol>
+        <p className="mt-3 text-xs text-foreground/65">
+          Catatan: satu akun hanya bisa submit satu kali. Setelah submit, cek status di halaman Cek Status.
+        </p>
       </article>
     </section>
   );
