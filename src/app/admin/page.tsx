@@ -26,6 +26,10 @@ function normalizeNim(rawNim: string) {
   return rawNim.trim().replace(/\D/g, "");
 }
 
+function isValidWeightUpdateNim(nim: string) {
+  return /^\d{8}$/.test(nim);
+}
+
 function parseVoteWeight(rawWeight: string): VoteWeightValue | null {
   const parsedWeight = Number(rawWeight);
 
@@ -643,8 +647,8 @@ export default function AdminPage() {
     }
 
     const normalizedNim = normalizeNim(manualWeightNim);
-    if (!normalizedNim) {
-      setMessage("NIM tidak valid untuk update bobot.");
+    if (!isValidWeightUpdateNim(normalizedNim)) {
+      setMessage("NIM tidak valid. Gunakan tepat 8 digit angka (contoh: 10224056).");
       return;
     }
 
@@ -708,7 +712,7 @@ export default function AdminPage() {
       const nim = normalizeNim(nimRaw);
       const bobotSuara = parseVoteWeight(weightRaw);
 
-      if (!nim || !bobotSuara) {
+      if (!isValidWeightUpdateNim(nim) || !bobotSuara) {
         invalidLines.push(line);
         continue;
       }
@@ -717,12 +721,12 @@ export default function AdminPage() {
     }
 
     if (parsedRows.length === 0) {
-      setMessage("Tidak ada data valid. Format wajib: nim,bobot (bobot: 1 | 1.5 | 2).");
+      setMessage("Tidak ada data valid. Format: nim,bobot dengan NIM 8 digit (bobot: 1 | 1.5 | 2).");
       return;
     }
 
     if (invalidLines.length > 0) {
-      setMessage(`Ada ${invalidLines.length} baris tidak valid. Perbaiki dulu format nim,bobot.`);
+      setMessage(`Ada ${invalidLines.length} baris tidak valid. Pastikan format nim,bobot dan NIM tepat 8 digit.`);
       return;
     }
 
@@ -881,7 +885,7 @@ export default function AdminPage() {
                     value={manualWeightNim}
                     onChange={(event) => setManualWeightNim(event.target.value)}
                     className="input-luxury"
-                    placeholder="Contoh: 10224xxx"
+                    placeholder="Contoh: 10224056 (8 digit)"
                   />
                 </label>
 
@@ -911,7 +915,7 @@ export default function AdminPage() {
               <section className="grid gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
                 <p className="font-semibold text-[--maroon]">Import Bulk (CSV/Paste)</p>
                 <p className="text-xs text-foreground/70">
-                  Format per baris: nim,bobot. Contoh: 10224001,2 atau 10224002,1.5
+                  Format per baris: nim,bobot dengan NIM tepat 8 digit. Contoh: 10224001,2 atau 10224002,1.5
                 </p>
 
                 <textarea
