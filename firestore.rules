@@ -23,28 +23,60 @@ service cloud.firestore {
         request.auth.token.email.matches('^' + nim + '@(student\\.itb\\.ac\\.id|mahasiswa\\.itb\\.ac\\.id|itb\\.ac\\.id)$');
     }
 
+    function isValidVoteWeight(weight) {
+      return weight in [1, 1.5, 2];
+    }
+
+    function isVotingOpen() {
+      return !exists(/databases/$(database)/documents/site_settings/voting_gate) ||
+        get(/databases/$(database)/documents/site_settings/voting_gate).data.isOpen == true;
+    }
+
     match /users/{nim} {
       allow read: if true;
 
       allow create, update: if
-        hasCampusEmail() &&
-        isValidNim(nim) &&
-        request.resource.data.nim == nim &&
-        request.resource.data.sudahVote == true &&
-        request.resource.data.statusHearing is bool &&
-        request.resource.data.selfieUrl is string &&
-        request.resource.data.voterUid == request.auth.uid &&
-        request.resource.data.voterEmail == request.auth.token.email;
+        (
+          isOwnerNim(nim) &&
+          isVotingOpen() &&
+          isValidNim(nim) &&
+          request.resource.data.nim == nim &&
+          request.resource.data.sudahVote == true &&
+          request.resource.data.statusHearing is bool &&
+          request.resource.data.selfieUrl is string &&
+          request.resource.data.voterUid == request.auth.uid &&
+          request.resource.data.voterEmail == request.auth.token.email &&
+          (
+            !("bobotSuara" in request.resource.data) ||
+            isValidVoteWeight(request.resource.data.bobotSuara)
+          )
+        ) ||
+        (
+          isAdmin() &&
+          isValidNim(nim) &&
+          request.resource.data.nim == nim &&
+          (
+            !("bobotSuara" in request.resource.data) ||
+            isValidVoteWeight(request.resource.data.bobotSuara)
+          )
+        );
 
       allow delete: if false;
     }
 
-    match /suara_masuk/{voteId} {
+    match /suara_masuk/{nim} {
       allow create: if
-        hasCampusEmail() &&
+        isOwnerNim(nim) &&
+        isVotingOpen() &&
+        isValidNim(nim) &&
+        !exists(/databases/$(database)/documents/suara_masuk/$(nim)) &&
+        request.resource.data.nim == nim &&
+        request.resource.data.voterUid == request.auth.uid &&
+        request.resource.data.voterEmail == request.auth.token.email &&
         request.resource.data.candidateId is string &&
         request.resource.data.candidateId.size() > 0 &&
-        request.resource.data.bobotSuara in [1, 2];
+        request.resource.data.statusHearing is bool &&
+        isValidVoteWeight(request.resource.data.bobotSuara);
 
       allow read: if true;
       allow update, delete: if false;

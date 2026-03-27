@@ -14,8 +14,27 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { getFirebaseAuth, db } from "@/lib/firebase";
+
+type VoteWeightValue = 1 | 1.5 | 2;
+
+const ALLOWED_VOTE_WEIGHTS: VoteWeightValue[] = [1, 1.5, 2];
+
+function normalizeNim(rawNim: string) {
+  return rawNim.trim().replace(/\D/g, "");
+}
+
+function parseVoteWeight(rawWeight: string): VoteWeightValue | null {
+  const parsedWeight = Number(rawWeight);
+
+  if (parsedWeight === 1 || parsedWeight === 1.5 || parsedWeight === 2) {
+    return parsedWeight;
+  }
+
+  return null;
+}
 
 type AuditLog = {
   actorEmail?: string;
@@ -28,6 +47,7 @@ type AuditLog = {
 };
 
 type HearingSettingsForm = {
+  sessionName: string;
   isActive: boolean;
   presensiAwalAktif: boolean;
   presensiAkhirAktif: boolean;
@@ -41,8 +61,6 @@ type HearingSessionSummary = {
   updatedAt?: Timestamp;
   isActive: boolean;
 };
-
-type PresensiFormMode = "awal" | "akhir" | null;
 
 type AnnouncementHistory = {
   id: string;
@@ -62,10 +80,10 @@ export default function AdminPage() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
   const [isSavingResultsVisibility, setIsSavingResultsVisibility] = useState(false);
+  const [isSavingVotingGate, setIsSavingVotingGate] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [hearingSessions, setHearingSessions] = useState<HearingSessionSummary[]>([]);
-  const [presensiFormMode, setPresensiFormMode] = useState<PresensiFormMode>(null);
   const [deletingSessionId, setDeletingSessionId] = useState("");
   const [announcementTitle, setAnnouncementTitle] = useState("Informasi Penting");
   const [announcementContent, setAnnouncementContent] = useState("");
@@ -73,15 +91,25 @@ export default function AdminPage() {
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState("");
   const [deletingAnnouncementId, setDeletingAnnouncementId] = useState("");
   const [showCandidateBreakdownPublic, setShowCandidateBreakdownPublic] = useState(false);
+  const [isVotingOpen, setIsVotingOpen] = useState(true);
   const [hearingSettings, setHearingSettings] = useState<HearingSettingsForm>({
+    sessionName: "",
     isActive: false,
     presensiAwalAktif: true,
     presensiAkhirAktif: true,
     presensiAwalToken: "",
     presensiAkhirToken: "",
   });
+  const [manualWeightNim, setManualWeightNim] = useState("");
+  const [manualWeightValue, setManualWeightValue] = useState<`${VoteWeightValue}`>("1");
+  const [bulkWeightInput, setBulkWeightInput] = useState("");
+  const [isSavingManualWeight, setIsSavingManualWeight] = useState(false);
+  const [isSavingBulkWeight, setIsSavingBulkWeight] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState("");
+  const [togglingSessionId, setTogglingSessionId] = useState("");
 
   const mapSessionToForm = useCallback((data: {
+    name?: string;
     isActive?: boolean;
     presensiAwalAktif?: boolean;
     presensiAkhirAktif?: boolean;
@@ -91,6 +119,7 @@ export default function AdminPage() {
     checkOutToken?: string;
   }): HearingSettingsForm => {
     return {
+      sessionName: data.name?.trim() ?? "",
       isActive: Boolean(data.isActive),
       presensiAwalAktif: Boolean(data.presensiAwalAktif ?? true),
       presensiAkhirAktif: Boolean(data.presensiAkhirAktif ?? true),
@@ -106,6 +135,7 @@ export default function AdminPage() {
     }
 
     const data = snapshot.data() as {
+      name?: string;
       isActive?: boolean;
       presensiAwalAktif?: boolean;
       presensiAkhirAktif?: boolean;
@@ -117,7 +147,7 @@ export default function AdminPage() {
 
     setHearingSettings(mapSessionToForm(data));
     setSelectedSessionId(sessionId);
-    setPresensiFormMode(null);
+    setEditingSessionId(sessionId);
     return true;
   }, [mapSessionToForm]);
 
@@ -159,7 +189,6 @@ export default function AdminPage() {
     } else {
       setSelectedSessionId("");
       setActiveSessionId("");
-      setPresensiFormMode(null);
     }
   }, [loadSessionById]);
 
@@ -203,6 +232,18 @@ export default function AdminPage() {
 
     const data = snapshot.data() as { showCandidateBreakdownPublic?: boolean };
     setShowCandidateBreakdownPublic(Boolean(data.showCandidateBreakdownPublic));
+  }, []);
+
+  const loadVotingGateSettings = useCallback(async () => {
+    const snapshot = await getDoc(doc(db, "site_settings", "voting_gate"));
+
+    if (!snapshot.exists()) {
+      setIsVotingOpen(true);
+      return;
+    }
+
+    const data = snapshot.data() as { isOpen?: boolean };
+    setIsVotingOpen(data.isOpen !== false);
   }, []);
 
   useEffect(() => {
@@ -253,6 +294,7 @@ export default function AdminPage() {
           loadHearingSettingsAndHistory(),
           loadAnnouncementHistory(),
           loadResultsVisibility(),
+          loadVotingGateSettings(),
         ]);
         setMessage("Audit log berhasil dimuat.");
       } catch {
@@ -263,7 +305,38 @@ export default function AdminPage() {
     });
 
     return unsubscribe;
-  }, [loadAnnouncementHistory, loadHearingSettingsAndHistory, loadResultsVisibility]);
+  }, [loadAnnouncementHistory, loadHearingSettingsAndHistory, loadResultsVisibility, loadVotingGateSettings]);
+
+  async function onToggleVotingGate(nextValue: boolean) {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa mengatur gate voting.");
+      return;
+    }
+
+    try {
+      setIsSavingVotingGate(true);
+
+      await setDoc(
+        doc(db, "site_settings", "voting_gate"),
+        {
+          isOpen: nextValue,
+          updatedAt: serverTimestamp(),
+          updatedByUid: user.uid,
+          updatedByEmail: user.email,
+        },
+        { merge: true },
+      );
+
+      setIsVotingOpen(nextValue);
+      setMessage(nextValue
+        ? "Gate voting berhasil dibuka. Mahasiswa bisa submit voting sekarang."
+        : "Gate voting berhasil ditutup. Submit voting ditahan sampai dibuka lagi.");
+    } catch {
+      setMessage("Gagal mengubah status gate voting.");
+    } finally {
+      setIsSavingVotingGate(false);
+    }
+  }
 
   async function onToggleResultsVisibility(nextValue: boolean) {
     if (!user || !isAdmin) {
@@ -382,22 +455,15 @@ export default function AdminPage() {
 
     let targetSessionId = selectedSessionId;
 
-    if (presensiFormMode === "awal" && hearingSettings.presensiAwalAktif && !hearingSettings.presensiAwalToken.trim()) {
-      setMessage("Token presensi awal wajib diisi.");
-      return;
-    }
-
-    if (presensiFormMode === "akhir" && hearingSettings.presensiAkhirAktif && !hearingSettings.presensiAkhirToken.trim()) {
-      setMessage("Token presensi akhir wajib diisi.");
-      return;
-    }
-
+    // Validasi: Kalau presensi awal aktif, tokennya wajib dipilih (tapi bisa kosong isinya)
+    // Kalau belum pilih awal/akhir, auto-enable presensi awal
     if (!hearingSettings.presensiAwalAktif && !hearingSettings.presensiAkhirAktif) {
-      setMessage("Minimal satu fase presensi (awal/akhir) harus aktif.");
+      setHearingSettings((prev) => ({
+        ...prev,
+        presensiAwalAktif: true,
+      }));
       return;
     }
-
-    const globalActive = hearingSettings.presensiAwalAktif || hearingSettings.presensiAkhirAktif;
 
     try {
       setIsSavingSettings(true);
@@ -407,12 +473,13 @@ export default function AdminPage() {
         targetSessionId = createdRef.id;
       }
 
+      const normalizedSessionName = hearingSettings.sessionName.trim() || `Sesi Hearing ${new Date().toLocaleString()}`;
+
       await setDoc(
         doc(db, "hearing_sessions", targetSessionId),
         {
-          name: hearingSessions.find((session) => session.id === targetSessionId)?.name
-            ?? `Sesi Hearing ${new Date().toLocaleString()}`,
-          isActive: globalActive,
+          name: normalizedSessionName,
+          isActive: hearingSettings.isActive,
           presensiAwalAktif: hearingSettings.presensiAwalAktif,
           presensiAkhirAktif: hearingSettings.presensiAkhirAktif,
           presensiAwalToken: hearingSettings.presensiAwalToken.trim(),
@@ -429,7 +496,7 @@ export default function AdminPage() {
       await setDoc(
         doc(db, "hearing_settings", "current"),
         {
-          activeSessionId: targetSessionId,
+          activeSessionId: hearingSettings.isActive ? targetSessionId : "",
           updatedAt: serverTimestamp(),
           updatedByUid: user.uid,
           updatedByEmail: user.email,
@@ -438,13 +505,96 @@ export default function AdminPage() {
       );
 
       setSelectedSessionId(targetSessionId);
-      setActiveSessionId(targetSessionId);
+      setActiveSessionId(hearingSettings.isActive ? targetSessionId : "");
       await loadHearingSettingsAndHistory();
-      setMessage("Sesi presensi hearing berhasil disimpan dan dijadikan sesi aktif.");
+      setEditingSessionId("");
+      setMessage(
+        hearingSettings.isActive
+          ? "Sesi presensi hearing berhasil disimpan dan diaktifkan."
+          : "Sesi presensi hearing berhasil disimpan dalam kondisi nonaktif.",
+      );
     } catch {
       setMessage("Gagal menyimpan sesi presensi hearing.");
     } finally {
       setIsSavingSettings(false);
+    }
+  }
+
+  async function onSetSessionActiveState(session: HearingSessionSummary, shouldBeActive: boolean) {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa mengubah status sesi.");
+      return;
+    }
+
+    try {
+      setTogglingSessionId(session.id);
+
+      if (shouldBeActive) {
+        const batch = writeBatch(db);
+
+        hearingSessions.forEach((candidateSession) => {
+          batch.set(
+            doc(db, "hearing_sessions", candidateSession.id),
+            {
+              isActive: candidateSession.id === session.id,
+              updatedAt: serverTimestamp(),
+              updatedByUid: user.uid,
+              updatedByEmail: user.email,
+            },
+            { merge: true },
+          );
+        });
+
+        batch.set(
+          doc(db, "hearing_settings", "current"),
+          {
+            activeSessionId: session.id,
+            updatedAt: serverTimestamp(),
+            updatedByUid: user.uid,
+            updatedByEmail: user.email,
+          },
+          { merge: true },
+        );
+
+        await batch.commit();
+        setMessage(`Sesi \"${session.name}\" berhasil diaktifkan.`);
+      } else {
+        const batch = writeBatch(db);
+
+        batch.set(
+          doc(db, "hearing_sessions", session.id),
+          {
+            isActive: false,
+            updatedAt: serverTimestamp(),
+            updatedByUid: user.uid,
+            updatedByEmail: user.email,
+          },
+          { merge: true },
+        );
+
+        if (activeSessionId === session.id) {
+          batch.set(
+            doc(db, "hearing_settings", "current"),
+            {
+              activeSessionId: "",
+              updatedAt: serverTimestamp(),
+              updatedByUid: user.uid,
+              updatedByEmail: user.email,
+            },
+            { merge: true },
+          );
+        }
+
+        await batch.commit();
+        setMessage(`Sesi \"${session.name}\" berhasil dinonaktifkan.`);
+      }
+
+      // PENTING: Reload state setelah update berhasil
+      await loadHearingSettingsAndHistory();
+    } catch {
+      setMessage("Gagal mengubah status sesi presensi.");
+    } finally {
+      setTogglingSessionId("");
     }
   }
 
@@ -483,6 +633,124 @@ export default function AdminPage() {
       setMessage("Gagal menghapus sesi presensi.");
     } finally {
       setDeletingSessionId("");
+    }
+  }
+
+  async function onSaveManualVoteWeight() {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa mengubah bobot suara.");
+      return;
+    }
+
+    const normalizedNim = normalizeNim(manualWeightNim);
+    if (!normalizedNim) {
+      setMessage("NIM tidak valid untuk update bobot.");
+      return;
+    }
+
+    const parsedWeight = parseVoteWeight(manualWeightValue);
+    if (!parsedWeight) {
+      setMessage("Bobot suara harus 1, 1.5, atau 2.");
+      return;
+    }
+
+    try {
+      setIsSavingManualWeight(true);
+
+      await setDoc(
+        doc(db, "users", normalizedNim),
+        {
+          nim: normalizedNim,
+          bobotSuara: parsedWeight,
+          bobotUpdatedAt: serverTimestamp(),
+          bobotUpdatedByUid: user.uid,
+          bobotUpdatedByEmail: user.email,
+        },
+        { merge: true },
+      );
+
+      setMessage(`Bobot suara NIM ${normalizedNim} diset ke ${parsedWeight}.`);
+      setManualWeightNim("");
+    } catch {
+      setMessage("Gagal menyimpan bobot suara manual.");
+    } finally {
+      setIsSavingManualWeight(false);
+    }
+  }
+
+  async function onSaveBulkVoteWeight() {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa import bobot suara.");
+      return;
+    }
+
+    const rawLines = bulkWeightInput
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (rawLines.length === 0) {
+      setMessage("Data bulk kosong. Isi format: nim,bobot.");
+      return;
+    }
+
+    const parsedRows: Array<{ nim: string; bobotSuara: VoteWeightValue }> = [];
+    const invalidLines: string[] = [];
+
+    for (const line of rawLines) {
+      const normalizedLine = line.replace(/;/g, ",").replace(/\t/g, ",");
+      const [nimRaw = "", weightRaw = ""] = normalizedLine.split(",").map((part) => part.trim());
+
+      if (nimRaw.toLowerCase() === "nim" && weightRaw.toLowerCase().includes("bobot")) {
+        continue;
+      }
+
+      const nim = normalizeNim(nimRaw);
+      const bobotSuara = parseVoteWeight(weightRaw);
+
+      if (!nim || !bobotSuara) {
+        invalidLines.push(line);
+        continue;
+      }
+
+      parsedRows.push({ nim, bobotSuara });
+    }
+
+    if (parsedRows.length === 0) {
+      setMessage("Tidak ada data valid. Format wajib: nim,bobot (bobot: 1 | 1.5 | 2).");
+      return;
+    }
+
+    if (invalidLines.length > 0) {
+      setMessage(`Ada ${invalidLines.length} baris tidak valid. Perbaiki dulu format nim,bobot.`);
+      return;
+    }
+
+    try {
+      setIsSavingBulkWeight(true);
+
+      const batch = writeBatch(db);
+      for (const row of parsedRows) {
+        batch.set(
+          doc(db, "users", row.nim),
+          {
+            nim: row.nim,
+            bobotSuara: row.bobotSuara,
+            bobotUpdatedAt: serverTimestamp(),
+            bobotUpdatedByUid: user.uid,
+            bobotUpdatedByEmail: user.email,
+          },
+          { merge: true },
+        );
+      }
+
+      await batch.commit();
+      setMessage(`Import bobot suara berhasil: ${parsedRows.length} NIM tersimpan.`);
+      setBulkWeightInput("");
+    } catch {
+      setMessage("Gagal import bobot suara bulk.");
+    } finally {
+      setIsSavingBulkWeight(false);
     }
   }
 
@@ -551,6 +819,117 @@ export default function AdminPage() {
                   Show ke Publik
                 </button>
               </div>
+            </div>
+          </section>
+        ) : null}
+
+        {isAdmin ? (
+          <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+            <div className="space-y-2">
+              <p className="subtitle-strong">Gate Voting (Open / Close)</p>
+              <p className="text-sm text-foreground/75">
+                Kontrol ini menentukan apakah mahasiswa bisa melakukan submit voting saat ini.
+              </p>
+            </div>
+
+            <div className="mt-4 grid gap-3 rounded-2xl border border-[--gold-soft] bg-[rgb(255_250_240/0.9)] p-4">
+              <p className="text-sm">
+                Status saat ini:{" "}
+                <span className="font-semibold text-[--maroon]">
+                  {isVotingOpen ? "Voting Dibuka" : "Voting Ditutup"}
+                </span>
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onToggleVotingGate(true)}
+                  disabled={isSavingVotingGate || isVotingOpen}
+                  className="button-gold inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  Open Gate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onToggleVotingGate(false)}
+                  disabled={isSavingVotingGate || !isVotingOpen}
+                  className="button-outline inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  Close Gate
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {isAdmin ? (
+          <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+            <div className="space-y-2">
+              <p className="subtitle-strong">Kelola Bobot Suara Manual</p>
+              <p className="text-sm text-foreground/75">
+                Gunakan bobot 1 (tidak hadir), 1.5 (hadir online), atau 2 (hadir offline). Jika bobot belum diisi, sistem pakai default 1.
+              </p>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <section className="grid gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+                <p className="font-semibold text-[--maroon]">Update Per NIM</p>
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">NIM</span>
+                  <input
+                    value={manualWeightNim}
+                    onChange={(event) => setManualWeightNim(event.target.value)}
+                    className="input-luxury"
+                    placeholder="Contoh: 10224xxx"
+                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">Bobot</span>
+                  <select
+                    value={manualWeightValue}
+                    onChange={(event) => setManualWeightValue(event.target.value as `${VoteWeightValue}`)}
+                    className="input-luxury"
+                  >
+                    {ALLOWED_VOTE_WEIGHTS.map((weight) => (
+                      <option key={weight} value={String(weight)}>{weight}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => void onSaveManualVoteWeight()}
+                  disabled={isSavingManualWeight}
+                  className="button-gold inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  {isSavingManualWeight ? "Menyimpan..." : "Simpan Bobot NIM"}
+                </button>
+              </section>
+
+              <section className="grid gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+                <p className="font-semibold text-[--maroon]">Import Bulk (CSV/Paste)</p>
+                <p className="text-xs text-foreground/70">
+                  Format per baris: nim,bobot. Contoh: 10224001,2 atau 10224002,1.5
+                </p>
+
+                <textarea
+                  value={bulkWeightInput}
+                  onChange={(event) => setBulkWeightInput(event.target.value)}
+                  className="input-luxury min-h-40"
+                  placeholder={"nim,bobot\n10224001,2\n10224002,1.5\n10224003,1"}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => void onSaveBulkVoteWeight()}
+                  disabled={isSavingBulkWeight}
+                  className="button-outline inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  {isSavingBulkWeight ? "Importing..." : "Import Bobot Bulk"}
+                </button>
+              </section>
             </div>
           </section>
         ) : null}
@@ -652,138 +1031,95 @@ export default function AdminPage() {
           <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
             <div className="space-y-2">
               <p className="subtitle-strong">Pengaturan Presensi Hearing</p>
-              <p className="text-sm text-foreground/75">
-                Status: Sesi presensi berhasil diaktifkan.
-              </p>
+                <p className="text-sm text-foreground/75">
+                  Status sesi aktif saat ini: <span className="font-semibold text-[--maroon]">{activeSessionId ? "Aktif" : "Tidak ada sesi aktif"}</span>
+                </p>
             </div>
 
             <div className="mt-4 grid gap-4">
-              <div className="grid gap-2 rounded-2xl border border-[--gold-soft] bg-[rgb(255_250_240/0.9)] p-4">
-                <p className="font-semibold text-[--maroon]">Alur Singkat</p>
-                <div className="grid gap-2 md:grid-cols-3">
-                  <div className="rounded-2xl border border-[--gold-soft] bg-white/80 p-3">
-                    <p className="subtitle-strong">1. Pilih Jenis</p>
-                    <p className="mt-1 text-xs text-foreground/70">
-                      Pilih Presensi Awal atau Presensi Akhir.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-[--gold-soft] bg-white/80 p-3">
-                    <p className="subtitle-strong">2. Isi Token</p>
-                    <p className="mt-1 text-xs text-foreground/70">
-                      Isi token sesuai fase presensi yang dipilih.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-[--gold-soft] bg-white/80 p-3">
-                    <p className="subtitle-strong">3. Simpan</p>
-                    <p className="mt-1 text-xs text-foreground/70">
-                      Klik Simpan untuk membuat/memperbarui sesi dan langsung aktif.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               <section className="grid gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
-                <p className="font-semibold text-[--maroon]">Buat Presensi</p>
-                <p className="text-sm text-foreground/75">
-                  Pilih dulu jenis presensi yang ingin dibuat atau diedit. Form token muncul setelah dipilih.
-                </p>
+                <p className="font-semibold text-[--maroon]">Buat Sesi Presensi Baru</p>
+                {editingSessionId ? (
+                  <p className="text-xs text-[--maroon] font-medium bg-[rgb(220_180_160/0.3)] rounded px-2 py-1">
+                    Mode Edit: Anda sedang mengubah session yang ada. Klik &quot;Simpan Perubahan&quot; untuk menyimpan.
+                  </p>
+                ) : null}
 
-                <div className="flex flex-wrap gap-2">
+                <label className="grid gap-1">
+                  <span className="font-semibold">Nama Sesi</span>
+                  <input
+                    value={hearingSettings.sessionName}
+                    onChange={(event) =>
+                      setHearingSettings((previous) => ({
+                        ...previous,
+                        sessionName: event.target.value,
+                      }))
+                    }
+                    className="input-luxury"
+                    placeholder="Contoh: Hearing 27 Maret Sore"
+                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">Token Presensi Awal</span>
+                  <input
+                    value={hearingSettings.presensiAwalToken}
+                    onChange={(event) =>
+                      setHearingSettings((previous) => ({
+                        ...previous,
+                        presensiAwalToken: event.target.value,
+                      }))
+                    }
+                    className="input-luxury"
+                    placeholder="Contoh: AWAL-HEARING (atau kosongkan jika tidak gunakan)"
+                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">Token Presensi Akhir</span>
+                  <input
+                    value={hearingSettings.presensiAkhirToken}
+                    onChange={(event) =>
+                      setHearingSettings((previous) => ({
+                        ...previous,
+                        presensiAkhirToken: event.target.value,
+                      }))
+                    }
+                    className="input-luxury"
+                    placeholder="Contoh: AKHIR-HEARING (atau kosongkan jika tidak gunakan)"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => void onSaveHearingSettings()}
+                  disabled={isSavingSettings}
+                  className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  {isSavingSettings ? (editingSessionId ? "Menyimpan..." : "Membuat...") : (editingSessionId ? "Simpan Perubahan" : "Buat Sesi Baru")}
+                </button>
+
+                {editingSessionId ? (
                   <button
                     type="button"
-                    onClick={() => setPresensiFormMode("awal")}
-                    className={presensiFormMode === "awal" ? "button-gold inline-flex w-full justify-center sm:w-fit" : "button-outline inline-flex w-full justify-center sm:w-fit"}
+                    onClick={() => {
+                      setEditingSessionId("");
+                      setHearingSettings({
+                        sessionName: "",
+                        isActive: false,
+                        presensiAwalAktif: true,
+                        presensiAkhirAktif: true,
+                        presensiAwalToken: "",
+                        presensiAkhirToken: "",
+                      });
+                      setSelectedSessionId("");
+                    }}
+                    className="button-outline inline-flex w-full items-center justify-center sm:w-fit"
                   >
-                    Presensi Awal
+                    Batal Edit
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setPresensiFormMode("akhir")}
-                    className={presensiFormMode === "akhir" ? "button-gold inline-flex w-full justify-center sm:w-fit" : "button-outline inline-flex w-full justify-center sm:w-fit"}
-                  >
-                    Presensi Akhir
-                  </button>
-                </div>
+                ) : null}
               </section>
-
-              {presensiFormMode === "awal" ? (
-                <section className="grid gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
-                  <p className="font-semibold text-[--maroon]">Form Presensi Awal</p>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={hearingSettings.presensiAwalAktif}
-                      onChange={(event) =>
-                        setHearingSettings((previous) => ({
-                          ...previous,
-                          presensiAwalAktif: event.target.checked,
-                        }))
-                      }
-                    />
-                    <span>Presensi awal aktif</span>
-                  </label>
-
-                  <label className="grid gap-1">
-                    <span className="font-semibold">Token Presensi Awal</span>
-                    <input
-                      value={hearingSettings.presensiAwalToken}
-                      onChange={(event) =>
-                        setHearingSettings((previous) => ({
-                          ...previous,
-                          presensiAwalToken: event.target.value,
-                        }))
-                      }
-                      className="input-luxury"
-                      placeholder="Contoh: AWAL-HEARING"
-                    />
-                  </label>
-
-                </section>
-              ) : null}
-
-              {presensiFormMode === "akhir" ? (
-                <section className="grid gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
-                  <p className="font-semibold text-[--maroon]">Form Presensi Akhir</p>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={hearingSettings.presensiAkhirAktif}
-                      onChange={(event) =>
-                        setHearingSettings((previous) => ({
-                          ...previous,
-                          presensiAkhirAktif: event.target.checked,
-                        }))
-                      }
-                    />
-                    <span>Presensi akhir aktif</span>
-                  </label>
-
-                  <label className="grid gap-1">
-                    <span className="font-semibold">Token Presensi Akhir</span>
-                    <input
-                      value={hearingSettings.presensiAkhirToken}
-                      onChange={(event) =>
-                        setHearingSettings((previous) => ({
-                          ...previous,
-                          presensiAkhirToken: event.target.value,
-                        }))
-                      }
-                      className="input-luxury"
-                      placeholder="Contoh: AKHIR-HEARING"
-                    />
-                  </label>
-
-                </section>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={() => void onSaveHearingSettings()}
-                disabled={isSavingSettings || !presensiFormMode}
-                className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
-              >
-                {isSavingSettings ? "Menyimpan..." : "Simpan Sesi Presensi"}
-              </button>
 
               {hearingSessions.length > 0 ? (
                 <section className="grid gap-2 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
@@ -803,7 +1139,6 @@ export default function AdminPage() {
                               type="button"
                               onClick={() => {
                                 void loadSessionById(session.id);
-                                setPresensiFormMode(null);
                               }}
                               className="min-w-0 flex-1 text-left"
                             >
@@ -818,13 +1153,32 @@ export default function AdminPage() {
 
                             <button
                               type="button"
+                              onClick={() => void onSetSessionActiveState(session, true)}
+                              disabled={togglingSessionId === session.id}
+                              className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-[--gold-soft] bg-white px-3 text-xs font-semibold text-[--maroon] transition hover:bg-[rgb(56_6_9/0.08)] disabled:opacity-60"
+                              title="Aktifkan sesi ini"
+                            >
+                              {togglingSessionId === session.id ? "..." : "Aktifkan"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => void onSetSessionActiveState(session, false)}
+                              disabled={togglingSessionId === session.id}
+                              className="inline-flex h-10 shrink-0 items-center justify-center rounded-full border border-[--gold-soft] bg-white px-3 text-xs font-semibold text-[--maroon] transition hover:bg-[rgb(56_6_9/0.08)] disabled:opacity-60"
+                              title="Nonaktifkan sesi"
+                            >
+                              {togglingSessionId === session.id ? "..." : "Nonaktifkan"}
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => {
                                 void loadSessionById(session.id);
-                                setPresensiFormMode("awal");
                               }}
                               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[--gold-soft] bg-white text-lg text-[--maroon] transition hover:bg-[rgb(56_6_9/0.08)]"
                               aria-label={`Edit sesi ${session.name}`}
-                              title="Edit sesi"
+                              title="Edit sesi (form di atas)"
                             >
                               ✎
                             </button>

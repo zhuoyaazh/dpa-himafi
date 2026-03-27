@@ -44,18 +44,20 @@ Buka [http://localhost:3000](http://localhost:3000).
 - `/login` → Login/logout
 - `/admin` → Panel admin
 
-## Konsep Data Voting (Anonim)
+## Konsep Data Voting (Operasional Panitia)
 
-- Koleksi `users`: `nim`, `selfieUrl`, `statusHearing`, `sudahVote`
-- Koleksi `suara_masuk`: `candidateId`, `bobotSuara`, `createdAt`
+- Koleksi `users/{nim}`: `nim`, `selfieUrl`, `statusHearing`, `sudahVote`, `voterUid`, `voterEmail`, `votedAt`
+- Koleksi `suara_masuk/{nim}`: `nim`, `candidateId`, `bobotSuara`, `statusHearing`, `voterUid`, `voterEmail`, `createdAt`
 
-Identitas pemilih dan suara dipisah agar panitia bisa verifikasi tanpa melihat pilihan suara per NIM.
+Dokumen `suara_masuk` sekarang memakai ID dokumen = NIM agar anti-duplikat per pemilih dan mudah direkap oleh panitia.
+Field `bobotSuara` dikelola manual oleh admin di panel `/admin` dengan nilai yang diizinkan: `1`, `1.5`, atau `2`.
+Jika bobot belum diisi untuk suatu NIM, sistem otomatis memakai default `1` saat submit vote.
 
 ## Catatan Implementasi
 
 - Inisialisasi Firebase ada di `lib/firebase.ts`.
 - Helper submit voting ada di `lib/voting.ts` (`submitVote`).
-- Untuk production, validasi `sudahVote` dan bobot hearing sebaiknya dilakukan via server/API agar tidak bisa dimanipulasi dari client.
+- Untuk production, validasi `sudahVote` dan bobot suara sebaiknya dilakukan via server/API agar tidak bisa dimanipulasi dari client.
 
 ## Contoh Rule Minimum (Firestore)
 
@@ -180,3 +182,18 @@ Catatan paket gratis (Spark):
 
 - finalisasi daftar calon dari data riil
 - buat halaman admin terpisah untuk rekap hasil
+
+## Rekap Akhir Masa Voting
+
+Jalankan command berikut setelah voting selesai:
+
+```bash
+pnpm recap:voting
+```
+
+Output akan dibuat di folder `exports/`:
+
+- `voting-recap-<timestamp>.json`
+- `voting-recap-<timestamp>.csv`
+
+Data rekap mencakup NIM, kandidat yang dipilih, bobot suara, status hearing, email/uid voter, timestamp voting, dan indikator sinkronisasi dokumen `users` vs `suara_masuk`.

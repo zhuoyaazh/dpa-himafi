@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { submitVote } from "@/lib/voting";
-import { getFirebaseAuth } from "@/lib/firebase";
+import { db, getFirebaseAuth } from "@/lib/firebase";
 import { getVoterIdentityError, normalizeNim } from "@/lib/voter-identity";
 import { CANDIDATES } from "@/lib/candidates";
 
@@ -114,6 +115,8 @@ export default function VotingPage() {
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [isVotingOpen, setIsVotingOpen] = useState(true);
+  const [isCheckingVotingGate, setIsCheckingVotingGate] = useState(true);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -123,6 +126,29 @@ export default function VotingPage() {
     });
 
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    async function loadVotingGate() {
+      try {
+        setIsCheckingVotingGate(true);
+        const gateSnapshot = await getDoc(doc(db, "site_settings", "voting_gate"));
+
+        if (!gateSnapshot.exists()) {
+          setIsVotingOpen(true);
+          return;
+        }
+
+        const data = gateSnapshot.data() as { isOpen?: boolean };
+        setIsVotingOpen(data.isOpen !== false);
+      } catch {
+        setIsVotingOpen(true);
+      } finally {
+        setIsCheckingVotingGate(false);
+      }
+    }
+
+    void loadVotingGate();
   }, []);
 
   const uploadFotoKeCloudinary = async (fileFoto: File) => {
@@ -191,6 +217,11 @@ export default function VotingPage() {
 
     if (!user) {
       setStatusMessage("Kamu harus login dulu sebelum voting.");
+      return;
+    }
+
+    if (!isVotingOpen) {
+      setStatusMessage("Voting sedang ditutup oleh panitia. Tunggu gate dibuka.");
       return;
     }
 
@@ -293,6 +324,14 @@ export default function VotingPage() {
           onSubmit={onSubmit}
           className="gold-card grid gap-4 overflow-hidden p-4 text-sm sm:p-6"
         >
+        <div className="rounded-2xl border border-[--gold-soft] bg-white/65 p-4 text-foreground/80">
+          Status Gate Voting: {isCheckingVotingGate
+            ? "Mengecek..."
+            : isVotingOpen
+              ? "Dibuka"
+              : "Ditutup"}
+        </div>
+
         <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/65 p-4 text-foreground/80">
           Login sebagai:{" "}
           <span className="mt-1 block w-fit max-w-full font-semibold sm:mt-0 sm:inline whitespace-nowrap">
@@ -342,13 +381,13 @@ export default function VotingPage() {
 
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !isVotingOpen || isCheckingVotingGate}
           className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
         >
           {isSubmitting ? "Mengirim..." : "Submit Voting"}
         </button>
 
-        <p className="break-words text-sm text-foreground/80">Status: {statusMessage || "-"}</p>
+        <p className="wrap-break-word text-foreground/80">Status: {statusMessage || "-"}</p>
         </form>
       ) : null}
     </section>

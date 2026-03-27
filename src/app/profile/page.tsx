@@ -105,7 +105,7 @@ export default function ProfilePage() {
           {isLoading ? "Mengecek..." : "Cek Status"}
         </button>
 
-        <p className="break-words text-foreground/80">{message || "-"}</p>
+        <p className="wrap-break-word text-foreground/80">{message || "-"}</p>
 
         {status ? (
           <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
@@ -113,7 +113,6 @@ export default function ProfilePage() {
             <p>Angkatan: {status.angkatan ?? "-"}</p>
             <p>Sudah Vote: {status.sudahVote ? "Ya" : "Belum"}</p>
             <p>Status Hearing: {status.statusHearing ? "Hadir" : "Tidak hadir"}</p>
-            <p>Bobot Suara: {status.statusHearing ? 2 : 1}</p>
             <p>
               Selfie Verifikasi: {status.selfieUrl ? "Tersimpan" : "Belum ada"}
             </p>

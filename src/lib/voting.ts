@@ -1,5 +1,4 @@
 import {
-  collection,
   doc,
   runTransaction,
   serverTimestamp,
@@ -16,6 +15,16 @@ type SubmitVotePayload = {
   selfieUrl?: string;
 };
 
+function normalizeVoteWeight(rawWeight: unknown): 1 | 1.5 | 2 {
+  const parsedWeight = Number(rawWeight);
+
+  if (parsedWeight === 1 || parsedWeight === 1.5 || parsedWeight === 2) {
+    return parsedWeight;
+  }
+
+  return 1;
+}
+
 export async function submitVote(payload: SubmitVotePayload) {
   const auth = getFirebaseAuth();
   const currentUser = auth.currentUser;
@@ -29,6 +38,16 @@ export async function submitVote(payload: SubmitVotePayload) {
     throw new Error("NIM tidak valid.");
   }
 
+  const votingGateRef = doc(db, "site_settings", "voting_gate");
+  const votingGateSnapshot = await getDoc(votingGateRef);
+  const votingGateData = votingGateSnapshot.exists()
+    ? (votingGateSnapshot.data() as { isOpen?: boolean })
+    : undefined;
+
+  if (votingGateData?.isOpen === false) {
+    throw new Error("Voting sedang ditutup oleh panitia. Tunggu gate dibuka.");
+  }
+
   const voterIdentityError = getVoterIdentityError(sanitizedNim, currentUser.email);
   if (voterIdentityError) {
     throw new Error(voterIdentityError);
@@ -37,8 +56,6 @@ export async function submitVote(payload: SubmitVotePayload) {
   const userRef = doc(db, "users", sanitizedNim);
   const userSnapshot = await getDoc(userRef);
   const existingData = userSnapshot.data();
-  const hearingWeight: 1 | 2 =
-    Boolean(existingData?.statusHearing ?? existingData?.status_hearing) ? 2 : 1;
 
   if (existingData?.sudahVote || existingData?.sudah_vote) {
     throw new Error("NIM ini sudah melakukan voting sebelumnya.");
@@ -60,14 +77,20 @@ export async function submitVote(payload: SubmitVotePayload) {
     throw new Error("URL selfie tidak ditemukan.");
   }
 
-  const voteRef = doc(collection(db, "suara_masuk"));
+  const voteRef = doc(db, "suara_masuk", sanitizedNim);
 
   await runTransaction(db, async (transaction) => {
     const freshUserSnapshot = await transaction.get(userRef);
     const freshUserData = freshUserSnapshot.data();
+    const freshVoteSnapshot = await transaction.get(voteRef);
+    const voteWeight = normalizeVoteWeight(freshUserData?.bobotSuara);
 
     if (freshUserData?.sudahVote || freshUserData?.sudah_vote) {
       throw new Error("NIM ini sudah melakukan voting sebelumnya.");
+    }
+
+    if (freshVoteSnapshot.exists()) {
+      throw new Error("NIM ini sudah tercatat melakukan voting.");
     }
 
     transaction.set(
@@ -75,8 +98,9 @@ export async function submitVote(payload: SubmitVotePayload) {
       {
         nim: sanitizedNim,
         selfieUrl,
-        statusHearing: hearingWeight === 2,
+        statusHearing: voteWeight > 1,
         sudahVote: true,
+        bobotSuara: voteWeight,
         voterUid: currentUser.uid,
         voterEmail: currentUser.email,
         votedAt: serverTimestamp(),
@@ -86,9 +110,14 @@ export async function submitVote(payload: SubmitVotePayload) {
     );
 
     transaction.set(voteRef, {
+      nim: sanitizedNim,
+      voterUid: currentUser.uid,
+      voterEmail: currentUser.email,
       candidateId: payload.candidateId,
-      bobotSuara: hearingWeight,
+      statusHearing: voteWeight > 1,
+      bobotSuara: voteWeight,
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
   });
 }
