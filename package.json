@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "sync:auth": "node scripts/sync-auth-from-firestore.mjs",
-    "recap:voting": "node scripts/export-voting-recap.mjs"
+    "recap:voting": "node scripts/export-voting-recap.mjs",
+    "recap:hearing": "node scripts/export-hearing-recap.mjs"
   },
   "dependencies": {
     "firebase": "^12.10.0",

@@ -205,8 +205,8 @@ export default function HasilPage() {
                         width: `${candidate.percentage <= 0 ? 0 : Math.min(Math.max(candidate.percentage, 4), 100)}%`,
                         background:
                           candidate.id === "calon-1"
-                            ? "linear-gradient(90deg, var(--maroon), var(--gold))"
-                            : "linear-gradient(90deg, var(--ink), var(--gold))",
+                            ? "linear-gradient(90deg, var(--ink), var(--gold))"
+                            : "linear-gradient(90deg, var(--maroon), var(--gold))",
                       }}
                     />
                   </div>
