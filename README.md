@@ -46,7 +46,7 @@ Buka [http://localhost:3000](http://localhost:3000).
 
 ## Konsep Data Voting (Operasional Panitia)
 
-- Koleksi `users/{nim}`: `nim`, `selfieUrl`, `statusHearing`, `sudahVote`, `voterUid`, `voterEmail`, `votedAt`
+- Koleksi `users/{nim}`: `nim`, `statusHearing`, `sudahVote`, `voterUid`, `voterEmail`, `votedAt`
 - Koleksi `suara_masuk/{nim}`: `nim`, `candidateId`, `bobotSuara`, `statusHearing`, `voterUid`, `voterEmail`, `createdAt`
 
 Dokumen `suara_masuk` sekarang memakai ID dokumen = NIM agar anti-duplikat per pemilih dan mudah direkap oleh panitia.
@@ -155,7 +155,7 @@ Catatan:
 Catatan implementasi MVP saat ini:
 
 - Login `NIM + Token` memakai Firebase Auth Email/Password.
-- Untuk alur ini, rules tidak mewajibkan `email_verified == true` agar upload selfie dan submit vote tidak tertolak.
+- Untuk alur ini, rules tidak mewajibkan `email_verified == true` agar submit vote tidak tertolak.
 
 ## Setup Firebase Auth (NIM + Password)
 
@@ -172,7 +172,7 @@ Catatan paket gratis (Spark):
 
 ## Fitur yang Sudah Aktif
 
-- Form voting di `/voting` (NIM, kandidat, checkbox hearing, upload selfie)
+- Form voting di `/voting` (NIM, kandidat)
 - Gate login di `/voting` (wajib login sebelum submit)
 - Login/logout NIM + Password di `/login`
 - Submit ke Firebase via `submitVote()` dengan anti double-vote sederhana (`sudahVote`)

@@ -43,7 +43,6 @@ service cloud.firestore {
           request.resource.data.nim == nim &&
           request.resource.data.sudahVote == true &&
           request.resource.data.statusHearing is bool &&
-          request.resource.data.selfieUrl is string &&
           request.resource.data.voterUid == request.auth.uid &&
           request.resource.data.voterEmail == request.auth.token.email &&
           (
@@ -130,6 +129,22 @@ service cloud.firestore {
     match /site_settings/{settingId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
+    }
+
+    match /user_profiles/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create, update: if
+        request.auth != null &&
+        request.auth.uid == uid &&
+        (!("uid" in request.resource.data) || request.resource.data.uid == uid) &&
+        (!("nim" in request.resource.data) || request.resource.data.nim is string || request.resource.data.nim == null) &&
+        (!("fullName" in request.resource.data) || request.resource.data.fullName is string) &&
+        (!("nickName" in request.resource.data) || request.resource.data.nickName is string) &&
+        (!("bio" in request.resource.data) || request.resource.data.bio is string) &&
+        (!("updatedAt" in request.resource.data) || request.resource.data.updatedAt is timestamp);
+
+      allow delete: if false;
     }
   }
 }

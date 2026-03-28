@@ -21,7 +21,7 @@ export const CANDIDATES: CandidateProfile[] = [
     nim: "10223075",
     name: "Muhammad Syamsuddiin",
     photoUrl: "/candidates/calon-1.png",
-    title: "Ace of Vision",
+    title: "10223075",
     tagline: "#BergerakBersama",
     vision:
       "Menciptakan HIMAFI ITB sebagai ruang yang apresiatif serta inkusif sehingga dapat menjadi wadah transformasi yang progresif bagi anggota serta lingkungan sekitarnya.",
@@ -44,7 +44,7 @@ export const CANDIDATES: CandidateProfile[] = [
     nim: "10223060",
     name: "Adrian Pandjie Ramdhani",
     photoUrl: "/candidates/calon-2.png",
-    title: "King of Governance",
+    title: "10223060",
     tagline: "#MerdekaBerkarya",
     vision:
       "HIMAFI ITB sebagai ruang berkarya yang merdeka dan berdampak.",

@@ -6,7 +6,8 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CANDIDATES } from "@/lib/candidates";
 import { getFirebaseAuth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { normalizeNim } from "@/lib/voter-identity";
 
 type ImportantInfo = {
   title: string;
@@ -19,11 +20,48 @@ type VoteRow = {
   bobotSuara?: number;
 };
 
+type RawUserDisplayProfile = {
+  nickName?: string;
+};
+
+function getProfileStorageKey(uid: string) {
+  return `user_display_profile_${uid}`;
+}
+
+function readNickNameFromLocalStorage(uid: string) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  try {
+    const raw = window.localStorage.getItem(getProfileStorageKey(uid));
+    if (!raw) {
+      return "";
+    }
+
+    const parsed = JSON.parse(raw) as RawUserDisplayProfile;
+    return parsed.nickName?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function getNimFromEmail(email: string | null | undefined) {
+  if (!email) {
+    return "";
+  }
+
+  const [localPart = ""] = email.split("@");
+  return normalizeNim(localPart);
+}
+
 export default function Home() {
   const [importantInfo, setImportantInfo] = useState<ImportantInfo | null>(null);
   const [votes, setVotes] = useState<VoteRow[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showCandidateBreakdownPublic, setShowCandidateBreakdownPublic] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [nickName, setNickName] = useState("");
 
   useEffect(() => {
     async function loadImportantInfo() {
@@ -87,16 +125,29 @@ export default function Home() {
 
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setCurrentUser(currentUser);
+
       if (!currentUser) {
         setIsAdmin(false);
+        setNickName("");
         return;
+      }
+
+      const localNickName = readNickNameFromLocalStorage(currentUser.uid);
+      if (localNickName) {
+        setNickName(localNickName);
       }
 
       try {
         const adminDoc = await getDoc(doc(db, "admin_users", currentUser.uid));
         setIsAdmin(adminDoc.exists() && adminDoc.data().active === true);
+
+        const profileDoc = await getDoc(doc(db, "user_profiles", currentUser.uid));
+        const profileData = profileDoc.exists() ? (profileDoc.data() as RawUserDisplayProfile) : undefined;
+        setNickName(profileData?.nickName?.trim() ?? localNickName);
       } catch {
         setIsAdmin(false);
+        setNickName(localNickName);
       }
     });
 
@@ -104,6 +155,7 @@ export default function Home() {
   }, []);
 
   const canViewCandidateBreakdown = isAdmin || showCandidateBreakdownPublic;
+  const greetingName = nickName || getNimFromEmail(currentUser?.email) || "Sobat HIMAFI";
 
   const voteSummary = useMemo(() => {
     const totalWeight = votes.reduce(
@@ -129,6 +181,15 @@ export default function Home() {
         <h1 className="section-title max-w-4xl">
           DPA HIMAFI ITB
         </h1>
+        {currentUser ? (
+          <p className="text-sm text-foreground/75">
+            Hai, Selamat Datang {greetingName}! Jangan lupa voting ya.
+          </p>
+        ) : (
+          <p className="text-sm text-foreground/75">
+            Hai, Selamat Datang! Login dulu untuk personalisasi dashboard kamu.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           <Link
             href="/login"
@@ -222,7 +283,7 @@ export default function Home() {
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-foreground/80">
           <li>Login dengan akun kampus ITB (NIM/email) di halaman Login.</li>
           <li>Buka Profil Calon untuk membaca visi-misi, draft, dan PPT kandidat.</li>
-          <li>Masuk ke halaman Voting, pilih kandidat, upload selfie verifikasi, lalu submit.</li>
+          <li>Masuk ke halaman Voting, pilih kandidat, lalu submit.</li>
         </ol>
         <p className="mt-3 text-xs text-foreground/65">
           Catatan: satu akun hanya bisa submit satu kali. Setelah submit, cek status di halaman Cek Status.

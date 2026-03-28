@@ -141,6 +141,7 @@ function parseFirestoreDocument(doc) {
 async function fetchCollection(projectId, apiKey, collectionName) {
   const rows = [];
   let pageToken = "";
+  let hasRetriedFromFirstPage = false;
 
   while (true) {
     const url = new URL(
@@ -154,7 +155,24 @@ async function fetchCollection(projectId, apiKey, collectionName) {
       url.searchParams.set("pageToken", pageToken);
     }
 
-    const payload = await fetchJsonWithRetry(url, collectionName);
+    let payload;
+
+    try {
+      payload = await fetchJsonWithRetry(url, collectionName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+
+      if (!hasRetriedFromFirstPage && message.includes("Invalid page token")) {
+        console.log("Token pagination kedaluwarsa. Mengulang fetch dari halaman pertama...");
+        rows.length = 0;
+        pageToken = "";
+        hasRetriedFromFirstPage = true;
+        continue;
+      }
+
+      throw error;
+    }
+
     const documents = payload.documents ?? [];
 
     for (const document of documents) {

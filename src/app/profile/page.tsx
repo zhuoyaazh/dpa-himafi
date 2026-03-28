@@ -9,7 +9,6 @@ type UserStatus = {
   nim: string;
   sudahVote: boolean;
   statusHearing: boolean;
-  selfieUrl?: string;
   angkatan?: number;
 };
 
@@ -19,8 +18,6 @@ type RawUserStatus = {
   sudah_vote?: boolean;
   statusHearing?: boolean;
   status_hearing?: boolean;
-  selfieUrl?: string;
-  foto_selfie_url?: string;
   angkatan?: number;
 };
 
@@ -56,7 +53,6 @@ export default function ProfilePage() {
         nim: data.nim ?? normalizedNim,
         sudahVote: Boolean(data.sudahVote ?? data.sudah_vote),
         statusHearing: Boolean(data.statusHearing ?? data.status_hearing),
-        selfieUrl: data.selfieUrl ?? data.foto_selfie_url,
         angkatan:
           typeof data.angkatan === "number" && !Number.isNaN(data.angkatan)
             ? data.angkatan
@@ -76,8 +72,7 @@ export default function ProfilePage() {
         <p className="section-kicker">Voter Ledger</p>
         <h1 className="section-title">Cek Status</h1>
         <p className="max-w-2xl text-sm text-foreground/75">
-        Menampilkan status akun pemilih: sudah voting/belum, hearing, dan data
-        verifikasi.
+        Menampilkan status akun pemilih: sudah voting/belum dan status hearing.
         </p>
       </header>
 
@@ -113,9 +108,6 @@ export default function ProfilePage() {
             <p>Angkatan: {status.angkatan ?? "-"}</p>
             <p>Sudah Vote: {status.sudahVote ? "Ya" : "Belum"}</p>
             <p>Status Hearing: {status.statusHearing ? "Hadir" : "Tidak hadir"}</p>
-            <p>
-              Selfie Verifikasi: {status.selfieUrl ? "Tersimpan" : "Belum ada"}
-            </p>
           </div>
         ) : null}
       </form>

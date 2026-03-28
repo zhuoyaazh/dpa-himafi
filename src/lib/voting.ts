@@ -4,15 +4,12 @@ import {
   serverTimestamp,
   getDoc,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { getFirebaseAuth, db, storage } from "@/lib/firebase";
+import { getFirebaseAuth, db } from "@/lib/firebase";
 import { getVoterIdentityError, normalizeNim } from "@/lib/voter-identity";
 
 type SubmitVotePayload = {
   nim: string;
   candidateId: string;
-  selfieFile?: File;
-  selfieUrl?: string;
 };
 
 function normalizeVoteWeight(rawWeight: unknown): 1 | 1.5 | 2 {
@@ -61,22 +58,6 @@ export async function submitVote(payload: SubmitVotePayload) {
     throw new Error("NIM ini sudah melakukan voting sebelumnya.");
   }
 
-  let selfieUrl = payload.selfieUrl;
-
-  if (!selfieUrl && payload.selfieFile) {
-    const selfieRef = ref(
-      storage,
-      `verifikasi-selfie/${sanitizedNim}/${Date.now()}-${payload.selfieFile.name}`,
-    );
-
-    await uploadBytes(selfieRef, payload.selfieFile);
-    selfieUrl = await getDownloadURL(selfieRef);
-  }
-
-  if (!selfieUrl) {
-    throw new Error("URL selfie tidak ditemukan.");
-  }
-
   const voteRef = doc(db, "suara_masuk", sanitizedNim);
 
   await runTransaction(db, async (transaction) => {
@@ -97,7 +78,6 @@ export async function submitVote(payload: SubmitVotePayload) {
       userRef,
       {
         nim: sanitizedNim,
-        selfieUrl,
         statusHearing: voteWeight > 1,
         sudahVote: true,
         bobotSuara: voteWeight,

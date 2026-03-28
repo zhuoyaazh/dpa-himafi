@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CANDIDATES } from "@/lib/candidates";
 
 export default function CalonPage() {
   const [selectedDraftCandidateId, setSelectedDraftCandidateId] = useState<string | null>(
     null,
   );
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const draftViewerRef = useRef<HTMLElement | null>(null);
 
   function onSelectDraft(candidateId: string) {
@@ -39,6 +40,36 @@ export default function CalonPage() {
     };
   }, [selectedDraftCandidateId]);
 
+  useEffect(() => {
+    const onResize = () => {
+      setIsMobileViewport(window.innerWidth < 768);
+    };
+
+    onResize();
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
+
+  const draftViewerSrc = useMemo(() => {
+    if (!selectedDraft) {
+      return "";
+    }
+
+    const desktopUrl = `${selectedDraft.draftUrl}#toolbar=1&navpanes=0&view=FitH`;
+    if (!isMobileViewport || typeof window === "undefined") {
+      return desktopUrl;
+    }
+
+    const absoluteDraftUrl = selectedDraft.draftUrl.startsWith("http")
+      ? selectedDraft.draftUrl
+      : `${window.location.origin}${selectedDraft.draftUrl}`;
+
+    return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(absoluteDraftUrl)}`;
+  }, [isMobileViewport, selectedDraft]);
+
   return (
     <section className="page-shell overflow-x-hidden">
       <header className="space-y-2">
@@ -58,7 +89,17 @@ export default function CalonPage() {
                   <p className="text-xs font-bold uppercase tracking-[0.35em] opacity-80">
                     Candidate {candidate.ballotNumber}
                   </p>
-                  <h2 className="font-display mt-3 wrap-break-word text-3xl sm:text-4xl">{candidate.name}</h2>
+                  <h2 className="font-display mt-3 hidden wrap-break-word text-4xl sm:block">{candidate.name}</h2>
+                  <h2 className="font-display mt-3 wrap-break-word text-3xl leading-tight sm:hidden">
+                    {candidate.name
+                      .split(" ")
+                      .filter(Boolean)
+                      .map((namePart, index) => (
+                        <span key={`${candidate.id}-name-${index}`} className="block">
+                          {namePart}
+                        </span>
+                      ))}
+                  </h2>
                   <p className="mt-2 wrap-break-word text-sm opacity-85">{candidate.nim}</p>
               </div>
 
@@ -174,11 +215,24 @@ export default function CalonPage() {
               </div>
               <iframe
                 key={selectedDraft.id}
-                src={`${selectedDraft.draftUrl}#toolbar=1&navpanes=0&view=FitH`}
+                src={draftViewerSrc}
                 title={`Draft ${selectedDraft.name}`}
                 className="w-full"
                 style={{ height: "clamp(360px, 68vh, 860px)" }}
               />
+              {isMobileViewport ? (
+                <div className="border-t border-[--gold-soft] bg-white/80 px-4 py-3 text-xs text-foreground/70">
+                  Jika preview belum muncul di perangkat kamu, gunakan tombol berikut:
+                  <a
+                    href={selectedDraft.draftUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="button-outline mt-2 inline-flex w-full items-center justify-center"
+                  >
+                    Buka File Draft
+                  </a>
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="grid min-h-60 place-items-center px-4 py-10 text-center text-sm text-foreground/65">

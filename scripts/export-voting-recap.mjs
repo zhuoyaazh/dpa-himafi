@@ -150,6 +150,7 @@ function parseFirestoreDocument(doc) {
 async function fetchCollection(projectId, apiKey, collectionName) {
   const rows = [];
   let pageToken = "";
+  let hasRetriedFromFirstPage = false;
 
   while (true) {
     const url = new URL(
@@ -163,7 +164,24 @@ async function fetchCollection(projectId, apiKey, collectionName) {
       url.searchParams.set("pageToken", pageToken);
     }
 
-    const payload = await fetchJsonWithRetry(url, collectionName);
+    let payload;
+
+    try {
+      payload = await fetchJsonWithRetry(url, collectionName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+
+      if (!hasRetriedFromFirstPage && message.includes("Invalid page token")) {
+        console.log("Token pagination kedaluwarsa. Mengulang fetch dari halaman pertama...");
+        rows.length = 0;
+        pageToken = "";
+        hasRetriedFromFirstPage = true;
+        continue;
+      }
+
+      throw error;
+    }
+
     const documents = payload.documents ?? [];
 
     for (const document of documents) {
@@ -255,7 +273,6 @@ function buildRecapRows(users, votes) {
       userVotedAt: toIsoDateString(user?.votedAt),
       voterEmail: String(vote?.voterEmail ?? user?.voterEmail ?? ""),
       voterUid: String(vote?.voterUid ?? user?.voterUid ?? ""),
-      selfieUrl: String(user?.selfieUrl ?? user?.foto_selfie_url ?? ""),
       angkatan: user?.angkatan == null ? "" : String(user.angkatan),
       hasVoteDoc: Boolean(vote),
       hasUserDoc: Boolean(user),
@@ -379,7 +396,6 @@ async function main() {
     "userVotedAt",
     "voterEmail",
     "voterUid",
-    "selfieUrl",
     "angkatan",
     "hasVoteDoc",
     "hasUserDoc",

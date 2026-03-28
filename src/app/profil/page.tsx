@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import { normalizeNim } from "@/lib/voter-identity";
 
@@ -12,7 +12,6 @@ type UserBiodata = {
   angkatan?: number;
   statusHearing?: boolean;
   sudahVote?: boolean;
-  selfieUrl?: string;
   voterEmail?: string;
   voterUid?: string;
 };
@@ -24,13 +23,57 @@ type RawUserBiodata = {
   status_hearing?: boolean;
   sudahVote?: boolean;
   sudah_vote?: boolean;
-  selfieUrl?: string;
-  foto_selfie_url?: string;
   voterEmail?: string;
   voter_email?: string;
   voterUid?: string;
   voter_uid?: string;
 };
+
+type UserDisplayProfile = {
+  fullName: string;
+  nickName: string;
+  bio: string;
+};
+
+type RawUserDisplayProfile = {
+  fullName?: string;
+  nickName?: string;
+  bio?: string;
+};
+
+function getProfileStorageKey(uid: string) {
+  return `user_display_profile_${uid}`;
+}
+
+function readProfileFromLocalStorage(uid: string): UserDisplayProfile | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(getProfileStorageKey(uid));
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as RawUserDisplayProfile;
+    return {
+      fullName: parsed.fullName?.trim() ?? "",
+      nickName: parsed.nickName?.trim() ?? "",
+      bio: parsed.bio?.trim() ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveProfileToLocalStorage(uid: string, profile: UserDisplayProfile) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(getProfileStorageKey(uid), JSON.stringify(profile));
+}
 
 function getNimFromEmail(email: string | null | undefined) {
   if (!email) {
@@ -46,7 +89,14 @@ export default function ProfilPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [profileMessage, setProfileMessage] = useState("");
   const [biodata, setBiodata] = useState<UserBiodata | null>(null);
+  const [profile, setProfile] = useState<UserDisplayProfile>({
+    fullName: "",
+    nickName: "",
+    bio: "",
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const nimFromEmail = useMemo(() => getNimFromEmail(user?.email), [user?.email]);
 
@@ -78,25 +128,44 @@ export default function ProfilPage() {
         setIsLoadingData(true);
         setStatusMessage("Mengambil biodata...");
 
+        const localProfile = readProfileFromLocalStorage(user.uid);
+        if (localProfile) {
+          setProfile(localProfile);
+        }
+
         const snapshot = await getDoc(doc(db, "users", nimFromEmail));
 
         if (!snapshot.exists()) {
           setBiodata(null);
           setStatusMessage("Data biodata belum ditemukan untuk akun ini.");
-          return;
+        } else {
+          const data = snapshot.data() as RawUserBiodata;
+          setBiodata({
+            nim: data.nim ?? nimFromEmail,
+            angkatan: typeof data.angkatan === "number" ? data.angkatan : undefined,
+            statusHearing: Boolean(data.statusHearing ?? data.status_hearing),
+            sudahVote: Boolean(data.sudahVote ?? data.sudah_vote),
+            voterEmail: data.voterEmail ?? data.voter_email,
+            voterUid: data.voterUid ?? data.voter_uid,
+          });
+          setStatusMessage("Biodata berhasil dimuat.");
         }
 
-        const data = snapshot.data() as RawUserBiodata;
-        setBiodata({
-          nim: data.nim ?? nimFromEmail,
-          angkatan: typeof data.angkatan === "number" ? data.angkatan : undefined,
-          statusHearing: Boolean(data.statusHearing ?? data.status_hearing),
-          sudahVote: Boolean(data.sudahVote ?? data.sudah_vote),
-          selfieUrl: data.selfieUrl ?? data.foto_selfie_url,
-          voterEmail: data.voterEmail ?? data.voter_email,
-          voterUid: data.voterUid ?? data.voter_uid,
-        });
-        setStatusMessage("Biodata berhasil dimuat.");
+        try {
+          const profileSnapshot = await getDoc(doc(db, "user_profiles", user.uid));
+          if (profileSnapshot.exists()) {
+            const profileData = profileSnapshot.data() as RawUserDisplayProfile;
+            const nextProfile = {
+              fullName: profileData.fullName?.trim() ?? "",
+              nickName: profileData.nickName?.trim() ?? "",
+              bio: profileData.bio?.trim() ?? "",
+            };
+            setProfile(nextProfile);
+            saveProfileToLocalStorage(user.uid, nextProfile);
+          }
+        } catch {
+          // Keep local profile if Firestore profile read fails.
+        }
       } catch {
         setBiodata(null);
         setStatusMessage("Gagal mengambil biodata user.");
@@ -107,6 +176,52 @@ export default function ProfilPage() {
 
     void loadBiodata();
   }, [user, nimFromEmail]);
+
+  async function onSaveDisplayProfile() {
+    if (!user) {
+      setProfileMessage("Kamu harus login dulu untuk menyimpan profil tampilan.");
+      return;
+    }
+
+    const fullName = profile.fullName.trim();
+    const nickName = profile.nickName.trim();
+    const bio = profile.bio.trim();
+
+    if (!nickName) {
+      setProfileMessage("Nama panggilan wajib diisi.");
+      return;
+    }
+
+    try {
+      setIsSavingProfile(true);
+
+      const nextProfile: UserDisplayProfile = {
+        fullName,
+        nickName,
+        bio,
+      };
+
+      saveProfileToLocalStorage(user.uid, nextProfile);
+
+      await setDoc(
+        doc(db, "user_profiles", user.uid),
+        {
+          uid: user.uid,
+          fullName,
+          nickName,
+          bio,
+        },
+        { merge: true },
+      );
+
+      setProfile(nextProfile);
+      setProfileMessage("Profil tampilan berhasil disimpan.");
+    } catch {
+      setProfileMessage("Profil tampilan berhasil disimpan di perangkat ini.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
 
   return (
     <section className="mx-auto w-full max-w-3xl space-y-6 overflow-x-hidden">
@@ -147,13 +262,64 @@ export default function ProfilPage() {
               <p>Angkatan: {biodata.angkatan ?? "-"}</p>
               <p>Status Hearing: {biodata.statusHearing ? "Hadir" : "Tidak hadir"}</p>
               <p>Sudah Vote: {biodata.sudahVote ? "Ya" : "Belum"}</p>
-              <p>Selfie Verifikasi: {biodata.selfieUrl ? "Tersimpan" : "Belum ada"}</p>
               <p>Voter Email Tercatat: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom">{biodata.voterEmail ?? "-"}</span></p>
               <p>Voter UID Tercatat: <span className="inline-block max-w-full overflow-x-auto whitespace-nowrap align-bottom">{biodata.voterUid ?? "-"}</span></p>
             </div>
           ) : null}
 
-          <p className="break-words text-foreground/80">Status: {statusMessage || "-"}</p>
+          <div className="min-w-0 rounded-2xl border border-[--gold-soft] bg-white/70 p-4 leading-7">
+            <p className="subtitle-strong">Profil Tampilan Dashboard</p>
+            <p className="mt-1 text-xs text-foreground/70">
+              Data ini hanya untuk personalisasi tampilan (sapaan dashboard), tidak memengaruhi sistem voting.
+            </p>
+
+            <div className="mt-3 grid gap-3">
+              <label className="grid min-w-0 gap-1">
+                <span className="font-semibold text-[--maroon]">Nama Lengkap</span>
+                <input
+                  value={profile.fullName}
+                  onChange={(event) => setProfile((prev) => ({ ...prev, fullName: event.target.value }))}
+                  className="input-luxury"
+                  placeholder="Contoh: Zhou Yiran"
+                />
+              </label>
+
+              <label className="grid min-w-0 gap-1">
+                <span className="font-semibold text-[--maroon]">Nama Panggilan</span>
+                <input
+                  value={profile.nickName}
+                  onChange={(event) => setProfile((prev) => ({ ...prev, nickName: event.target.value }))}
+                  className="input-luxury"
+                  placeholder="Contoh: Yiran"
+                />
+              </label>
+
+              <label className="grid min-w-0 gap-1">
+                <span className="font-semibold text-[--maroon]">Bio Singkat (Opsional)</span>
+                <textarea
+                  value={profile.bio}
+                  onChange={(event) => setProfile((prev) => ({ ...prev, bio: event.target.value }))}
+                  className="input-luxury min-h-24 resize-y"
+                  placeholder="Contoh: Semangat voting!"
+                />
+              </label>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onSaveDisplayProfile()}
+                  disabled={isSavingProfile}
+                  className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  {isSavingProfile ? "Menyimpan..." : "Simpan Profil Tampilan"}
+                </button>
+              </div>
+
+              <p className="wrap-break-word text-foreground/80">Status Profil Tampilan: {profileMessage || "-"}</p>
+            </div>
+          </div>
+
+          <p className="wrap-break-word text-foreground/80">Status: {statusMessage || "-"}</p>
         </div>
       ) : null}
     </section>
