@@ -36,7 +36,7 @@ export const CANDIDATES: CandidateProfile[] = [
     accent: "from-[#1A1A1A] via-[#2b2b2b] to-[#C49A6C]",
     suit: "♠",
     draftUrl: "/drafts/calon-1.pdf",
-    pptUrl: "",
+    pptUrl: "/ppt/calon-1.pdf",
   },
   {
     id: "calon-2",
@@ -57,7 +57,7 @@ export const CANDIDATES: CandidateProfile[] = [
     accent: "from-[#380609] via-[#5f0d12] to-[#D4AF37]",
     suit: "♦",
     draftUrl: "/drafts/calon-2.pdf",
-    pptUrl: "",
+    pptUrl: "/ppt/calon-2.pdf",
   },
 ];
 

@@ -98,6 +98,44 @@ select {
   box-shadow: 0 0 0 3px rgb(212 175 55 / 0.15);
 }
 
+/* Mobile device safeguards for consistent rendering across all phones */
+@supports (touch-action: auto) {
+  /* Touch devices: Samsung, Apple, etc */
+  body {
+    overflow-x: clip !important;
+  }
+  
+  main {
+    overflow-x: clip !important;
+  }
+
+  article {
+    overflow: clip !important;
+    -webkit-clip-path: inset(0);
+    clip-path: inset(0);
+  }
+}
+
+/* Ensure images and iframes never overflow */
+img,
+iframe {
+  max-width: 100%;
+  display: block;
+}
+
+/* Responsive text scaling for better mobile compat */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 13px;
+  }
+}
+
 .button-gold {
   @apply max-w-full rounded-full px-5 py-3 text-center text-sm font-bold uppercase tracking-[0.18em];
   color: #fffaf0;
