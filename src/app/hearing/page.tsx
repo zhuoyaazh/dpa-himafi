@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import { normalizeNim } from "@/lib/voter-identity";
+import { useToast, ToastContainer } from "@/components/toast-notification";
 
 type HearingPhase = "presensiAwal" | "presensiAkhir";
 
@@ -99,6 +100,7 @@ export default function HearingPage() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [settings, setSettings] = useState<HearingSettings | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
+  const { toasts, addToast, removeToast } = useToast();
 
   const nimFromEmail = useMemo(() => getNimFromEmail(user?.email), [user?.email]);
 
@@ -262,56 +264,72 @@ export default function HearingPage() {
     event.preventDefault();
 
     if (!user?.email) {
-      setStatusMessage("Kamu harus login dulu untuk presensi hearing.");
+      const msg = "Kamu harus login dulu untuk presensi hearing.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     if (!nimFromEmail) {
-      setStatusMessage("NIM tidak bisa dibaca dari email akun.");
+      const msg = "NIM tidak bisa dibaca dari email akun.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     if (!settings) {
-      setStatusMessage("Pengaturan presensi belum tersedia. Minta admin aktifkan sesi presensi dulu.");
+      const msg = "Pengaturan presensi belum tersedia. Minta admin aktifkan sesi presensi dulu.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     if (!settings.isActive) {
-      setStatusMessage("Presensi hearing sedang nonaktif.");
+      const msg = "Presensi hearing sedang nonaktif.";
+      setStatusMessage(msg);
+      addToast(msg, "warning");
       return;
     }
 
     const phaseActive =
       phase === "presensiAwal" ? settings.presensiAwalAktif : settings.presensiAkhirAktif;
     if (!phaseActive) {
-      setStatusMessage(
-        phase === "presensiAwal"
+      const msg = phase === "presensiAwal"
           ? "Presensi awal sedang nonaktif."
-          : "Presensi akhir sedang nonaktif.",
-      );
+          : "Presensi akhir sedang nonaktif.";
+      setStatusMessage(msg);
+      addToast(msg, "warning");
       return;
     }
 
     const trimmedToken = token.trim();
     if (!trimmedToken) {
-      setStatusMessage("Token presensi wajib diisi.");
+      const msg = "Token presensi wajib diisi.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     const expectedToken = phase === "presensiAwal" ? settings.presensiAwalToken : settings.presensiAkhirToken;
     if (trimmedToken !== expectedToken) {
-      setStatusMessage("Token tidak valid untuk fase presensi ini.");
+      const msg = "Token tidak valid untuk fase presensi ini.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     if (!proofFile) {
-      setStatusMessage("Upload Bukti Kehadiran wajib diisi.");
+      const msg = "Upload Bukti Kehadiran wajib diisi.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setStatusMessage("Mengunggah bukti kehadiran...");
+      const loadingMsg = "Mengunggah bukti kehadiran...";
+      setStatusMessage(loadingMsg);
+      addToast(loadingMsg, "info");
 
       const proofUrl = await uploadBuktiKehadiran(proofFile);
       const attendanceRef = doc(db, "hearing_attendance", nimFromEmail);
@@ -378,10 +396,13 @@ export default function HearingPage() {
 
       setProofFile(null);
       setToken("");
-      setStatusMessage("Presensi hearing berhasil tercatat.");
+      const successMsg = "Presensi hearing berhasil tercatat. Terima kasih!";
+      setStatusMessage(successMsg);
+      addToast(successMsg, "success");
     } catch (error) {
       const text = error instanceof Error ? error.message : "Presensi hearing gagal diproses.";
       setStatusMessage(text);
+      addToast(text, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -484,6 +505,8 @@ export default function HearingPage() {
           <p className="wrap-break-word text-foreground/80">Status: {statusMessage || "-"}</p>
         </form>
       ) : null}
+      
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </section>
   );
 }

@@ -8,6 +8,7 @@ import { submitVote } from "@/lib/voting";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import { getVoterIdentityError, normalizeNim } from "@/lib/voter-identity";
 import { CANDIDATES } from "@/lib/candidates";
+import { useToast, ToastContainer } from "@/components/toast-notification";
 
 export default function VotingPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -18,6 +19,7 @@ export default function VotingPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [isVotingOpen, setIsVotingOpen] = useState(true);
   const [isCheckingVotingGate, setIsCheckingVotingGate] = useState(true);
+  const { toasts, addToast, removeToast } = useToast();
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -56,48 +58,66 @@ export default function VotingPage() {
     event.preventDefault();
 
     if (!user) {
-      setStatusMessage("Kamu harus login dulu sebelum voting.");
+      const msg = "Kamu harus login dulu sebelum voting.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     if (!isVotingOpen) {
-      setStatusMessage("Voting sedang ditutup oleh panitia. Tunggu gate dibuka.");
+      const msg = "Voting sedang ditutup oleh panitia. Tunggu gate dibuka.";
+      setStatusMessage(msg);
+      addToast(msg, "warning");
       return;
     }
 
     if (!nim.trim()) {
-      setStatusMessage("NIM wajib diisi.");
+      const msg = "NIM wajib diisi.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     const sanitizedNim = normalizeNim(nim);
     if (!sanitizedNim) {
-      setStatusMessage("NIM tidak valid.");
+      const msg = "NIM tidak valid.";
+      setStatusMessage(msg);
+      addToast(msg, "error");
       return;
     }
 
     const voterIdentityError = getVoterIdentityError(sanitizedNim, user.email);
     if (voterIdentityError) {
       setStatusMessage(voterIdentityError);
+      addToast(voterIdentityError, "error");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setStatusMessage("Mengirim suara...");
+      const loadingMsg = "Mengirim suara...";
+      setStatusMessage(loadingMsg);
+      addToast(loadingMsg, "info");
 
       await submitVote({
         nim: sanitizedNim,
         candidateId,
       });
 
-      setStatusMessage("Voting berhasil disubmit. Terima kasih!");
+      const successMsg = "Voting berhasil disubmit. Terima kasih!";
+      setStatusMessage(successMsg);
+      addToast(successMsg, "success");
+      
+      // Clear form after successful submit
+      setNim("");
+      setCandidateId(CANDIDATES[0].id);
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Terjadi kendala saat submit voting.";
       setStatusMessage(message);
+      addToast(message, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -198,6 +218,8 @@ export default function VotingPage() {
         <p className="wrap-break-word text-foreground/80">Status: {statusMessage || "-"}</p>
         </form>
       ) : null}
+      
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </section>
   );
 }
