@@ -1,25 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { submitVote } from "@/lib/voting";
 import { db, getFirebaseAuth } from "@/lib/firebase";
-import { getVoterIdentityError, normalizeNim } from "@/lib/voter-identity";
+import {
+  extractNimFromCampusEmail,
+  getVoterIdentityError,
+} from "@/lib/voter-identity";
 import { CANDIDATES } from "@/lib/candidates";
 import { useToast, ToastContainer } from "@/components/toast-notification";
 
 export default function VotingPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [nim, setNim] = useState("");
   const [candidateId, setCandidateId] = useState(CANDIDATES[0].id);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [isVotingOpen, setIsVotingOpen] = useState(true);
   const [isCheckingVotingGate, setIsCheckingVotingGate] = useState(true);
   const { toasts, addToast, removeToast } = useToast();
+  const derivedNim = useMemo(
+    () => extractNimFromCampusEmail(user?.email),
+    [user?.email],
+  );
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -71,22 +77,14 @@ export default function VotingPage() {
       return;
     }
 
-    if (!nim.trim()) {
-      const msg = "NIM wajib diisi.";
+    if (!derivedNim) {
+      const msg = "Email login tidak memuat format NIM yang valid untuk voting.";
       setStatusMessage(msg);
       addToast(msg, "error");
       return;
     }
 
-    const sanitizedNim = normalizeNim(nim);
-    if (!sanitizedNim) {
-      const msg = "NIM tidak valid.";
-      setStatusMessage(msg);
-      addToast(msg, "error");
-      return;
-    }
-
-    const voterIdentityError = getVoterIdentityError(sanitizedNim, user.email);
+    const voterIdentityError = getVoterIdentityError(derivedNim, user.email);
     if (voterIdentityError) {
       setStatusMessage(voterIdentityError);
       addToast(voterIdentityError, "error");
@@ -100,16 +98,13 @@ export default function VotingPage() {
       addToast(loadingMsg, "info");
 
       await submitVote({
-        nim: sanitizedNim,
+        nim: derivedNim,
         candidateId,
       });
 
       const successMsg = "Voting berhasil disubmit. Terima kasih!";
       setStatusMessage(successMsg);
       addToast(successMsg, "success");
-      
-      // Clear form after successful submit
-      setNim("");
       setCandidateId(CANDIDATES[0].id);
     } catch (error) {
       const message =
@@ -156,7 +151,7 @@ export default function VotingPage() {
         <p className="subtitle-strong">Panduan Voting</p>
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-foreground/80">
           <li>Pastikan sudah login dengan email kampus ITB yang valid.</li>
-          <li>Isi NIM sesuai awal email login, lalu pilih kandidat.</li>
+          <li>NIM akan terdeteksi otomatis dari email login, lalu pilih kandidat.</li>
           <li>Klik Submit Voting satu kali dan tunggu konfirmasi berhasil.</li>
         </ol>
       </article>
@@ -179,16 +174,15 @@ export default function VotingPage() {
           <span className="mt-1 block w-fit max-w-full font-semibold sm:mt-0 sm:inline whitespace-nowrap">
             {user.email}
           </span>
-          . NIM wajib sesuai bagian awal email kampus.
+          . NIM terdeteksi otomatis dari bagian awal email kampus.
         </div>
         <label className="grid min-w-0 gap-1">
           <span className="font-semibold text-[--maroon]">NIM</span>
           <input
-            value={nim}
-            onChange={(event) => setNim(event.target.value)}
-            required
+            value={derivedNim}
+            readOnly
             className="input-luxury w-full min-w-0"
-            placeholder="Masukkan NIM"
+            placeholder="NIM otomatis dari email"
           />
         </label>
 
@@ -209,7 +203,7 @@ export default function VotingPage() {
 
         <button
           type="submit"
-          disabled={isSubmitting || !isVotingOpen || isCheckingVotingGate}
+          disabled={isSubmitting || !isVotingOpen || isCheckingVotingGate || !derivedNim}
           className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
         >
           {isSubmitting ? "Mengirim..." : "Submit Voting"}

@@ -8,7 +8,7 @@ service cloud.firestore {
     function hasCampusEmail() {
       return request.auth != null &&
         request.auth.token.email is string &&
-        request.auth.token.email.matches('^[^@]+@(student\\.itb\\.ac\\.id|mahasiswa\\.itb\\.ac\\.id|itb\\.ac\\.id)$');
+        request.auth.token.email.matches('^[^@]+@([a-zA-Z0-9-]+\\.)*itb\\.ac\\.id$');
     }
 
     function isAdmin() {
@@ -20,7 +20,7 @@ service cloud.firestore {
     function isOwnerNim(nim) {
       return request.auth != null &&
         hasCampusEmail() &&
-        request.auth.token.email.matches('^' + nim + '@(student\\.itb\\.ac\\.id|mahasiswa\\.itb\\.ac\\.id|itb\\.ac\\.id)$');
+        request.auth.token.email.matches('^' + nim + '[^@]*@([a-zA-Z0-9-]+\\.)*itb\\.ac\\.id$');
     }
 
     function isValidVoteWeight(weight) {

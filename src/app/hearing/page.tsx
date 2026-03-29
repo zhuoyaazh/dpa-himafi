@@ -39,6 +39,10 @@ type HearingAttendance = {
   checkOutAt?: Timestamp;
   presensiAwalAt?: Timestamp;
   presensiAkhirAt?: Timestamp;
+  presensiAwalProofUrl?: string;
+  presensiAkhirProofUrl?: string;
+  checkInProofUrl?: string;
+  checkOutProofUrl?: string;
 };
 
 function getNimFromEmail(email: string | null | undefined) {

@@ -1,8 +1,4 @@
-const CAMPUS_EMAIL_DOMAINS = [
-  "student.itb.ac.id",
-  "mahasiswa.itb.ac.id",
-  "itb.ac.id",
-];
+const CAMPUS_EMAIL_PATTERN = /^[^@]+@([a-z0-9-]+\.)*itb\.ac\.id$/i;
 
 export const PRIMARY_CAMPUS_EMAIL_DOMAIN = "mahasiswa.itb.ac.id";
 
@@ -26,8 +22,18 @@ export function nimToCampusEmail(nim: string) {
 }
 
 export function isCampusEmail(email: string) {
-  const { domain } = getEmailParts(email);
-  return CAMPUS_EMAIL_DOMAINS.includes(domain);
+  const trimmedEmail = email.trim();
+  return CAMPUS_EMAIL_PATTERN.test(trimmedEmail);
+}
+
+export function extractNimFromCampusEmail(email: string | null | undefined) {
+  if (!email) {
+    return "";
+  }
+
+  const { localPart } = getEmailParts(email);
+  const leadingDigits = localPart.match(/^\d+/)?.[0] ?? "";
+  return normalizeNim(leadingDigits);
 }
 
 export function doesNimMatchCampusEmail(nim: string, email: string) {
@@ -47,11 +53,11 @@ export function getVoterIdentityError(nim: string, email: string | null | undefi
   }
 
   if (!isCampusEmail(email)) {
-    return "Gunakan email kampus ITB untuk voting.";
+    return "Gunakan email kampus ITB (domain *.itb.ac.id) untuk voting.";
   }
 
   if (!doesNimMatchCampusEmail(nim, email)) {
-    return "NIM harus sesuai dengan bagian awal email kampus kamu.";
+    return "NIM harus sesuai bagian awal email kampus kamu.";
   }
 
   return null;
