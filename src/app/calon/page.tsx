@@ -226,14 +226,24 @@ export default function CalonPage() {
               <div className="border-b border-[--gold-soft] bg-white/80 px-4 py-3 text-sm font-semibold text-[--maroon]">
                 Sedang ditampilkan: {selectedDocument.name} ({selectedDocument.documentType === "draft" ? "Draft" : "PPT"})
               </div>
-              <iframe
-                key={selectedDocument.id}
-                src={documentViewerSrc}
-                title={`${selectedDocument.documentType === "draft" ? "Draft" : "PPT"} ${selectedDocument.name}`}
-                className="block w-full"
-                style={{ height: "clamp(280px, 60vh, 800px)" }}
-                sandbox="allow-same-origin"
-              />
+              {isMobileViewport ? (
+                <iframe
+                  key={`${selectedDocument.id}-mobile`}
+                  src={documentViewerSrc}
+                  title={`${selectedDocument.documentType === "draft" ? "Draft" : "PPT"} ${selectedDocument.name}`}
+                  className="block w-full"
+                  style={{ height: "clamp(280px, 60vh, 800px)" }}
+                  sandbox="allow-same-origin"
+                />
+              ) : (
+                <embed
+                  key={`${selectedDocument.id}-desktop`}
+                  src={documentViewerSrc}
+                  type="application/pdf"
+                  className="block w-full"
+                  style={{ height: "clamp(280px, 60vh, 800px)" }}
+                />
+              )}
               {isMobileViewport ? (
                 <div className="border-t border-[--gold-soft] bg-white/80 px-4 py-3 text-xs text-foreground/70">
                   Jika preview belum muncul di perangkat kamu, gunakan tombol berikut:
