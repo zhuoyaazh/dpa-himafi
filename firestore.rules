@@ -32,6 +32,64 @@ service cloud.firestore {
         get(/databases/$(database)/documents/site_settings/voting_gate).data.isOpen == true;
     }
 
+    function isValidHearingClassification(value) {
+      return !(value is string) || value in ["", "awal_only", "akhir_only", "awal_akhir", "tidak_valid", "dari_users_doc"];
+    }
+
+    function isAllowedHearingSyncFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "statusHearing",
+        "status_hearing",
+        "hearingClassification",
+        "hearingUpdatedAt",
+        "updatedAt",
+        "presensiAwalAt",
+        "presensiAkhirAt",
+        "presensiAwalProofUrl",
+        "presensiAkhirProofUrl",
+        "checkInAt",
+        "checkOutAt",
+        "checkInProofUrl",
+        "checkOutProofUrl"
+      ]);
+    }
+
+    function isAllowedHearingCreateFields() {
+      return request.resource.data.keys().hasOnly([
+        "nim",
+        "statusHearing",
+        "status_hearing",
+        "hearingClassification",
+        "hearingUpdatedAt",
+        "updatedAt",
+        "presensiAwalAt",
+        "presensiAkhirAt",
+        "presensiAwalProofUrl",
+        "presensiAkhirProofUrl",
+        "checkInAt",
+        "checkOutAt",
+        "checkInProofUrl",
+        "checkOutProofUrl"
+      ]);
+    }
+
+    function isValidHearingSyncPayload(nim) {
+      return request.resource.data.nim == nim &&
+        request.resource.data.statusHearing is bool &&
+        request.resource.data.status_hearing is bool &&
+        (!("hearingClassification" in request.resource.data) || isValidHearingClassification(request.resource.data.hearingClassification)) &&
+        (!("hearingUpdatedAt" in request.resource.data) || request.resource.data.hearingUpdatedAt is timestamp) &&
+        (!("updatedAt" in request.resource.data) || request.resource.data.updatedAt is timestamp) &&
+        (!("presensiAwalAt" in request.resource.data) || request.resource.data.presensiAwalAt is timestamp) &&
+        (!("presensiAkhirAt" in request.resource.data) || request.resource.data.presensiAkhirAt is timestamp) &&
+        (!("presensiAwalProofUrl" in request.resource.data) || request.resource.data.presensiAwalProofUrl is string) &&
+        (!("presensiAkhirProofUrl" in request.resource.data) || request.resource.data.presensiAkhirProofUrl is string) &&
+        (!("checkInAt" in request.resource.data) || request.resource.data.checkInAt is timestamp) &&
+        (!("checkOutAt" in request.resource.data) || request.resource.data.checkOutAt is timestamp) &&
+        (!("checkInProofUrl" in request.resource.data) || request.resource.data.checkInProofUrl is string) &&
+        (!("checkOutProofUrl" in request.resource.data) || request.resource.data.checkOutProofUrl is string);
+    }
+
     match /users/{nim} {
       allow read: if true;
 
@@ -58,6 +116,15 @@ service cloud.firestore {
             !("bobotSuara" in request.resource.data) ||
             isValidVoteWeight(request.resource.data.bobotSuara)
           )
+        ) ||
+        (
+          isOwnerNim(nim) &&
+          isValidNim(nim) &&
+          (
+            (resource == null && isAllowedHearingCreateFields()) ||
+            (resource != null && isAllowedHearingSyncFields())
+          ) &&
+          isValidHearingSyncPayload(nim)
         );
 
       allow delete: if false;

@@ -5,6 +5,7 @@ const DEFAULT_OUTPUT_DIR = "exports";
 const DEFAULT_COLLECTION_PAGE_SIZE = 300;
 const DEFAULT_FETCH_RETRY = 4;
 const RETRY_BASE_DELAY_MS = 500;
+const MAX_INVALID_PAGE_TOKEN_RECOVERY = 5;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,12 +26,18 @@ function isRetryableFetchError(error) {
   );
 }
 
-async function fetchJsonWithRetry(url, collectionName) {
+async function fetchJsonWithRetry(url, collectionName, authToken = "") {
   let lastError;
 
   for (let attempt = 1; attempt <= DEFAULT_FETCH_RETRY; attempt += 1) {
     try {
-      const response = await fetch(url);
+      const headers = authToken
+        ? {
+            Authorization: `Bearer ${authToken}`,
+          }
+        : undefined;
+
+      const response = await fetch(url, { headers });
 
       if (!response.ok) {
         const body = await response.text();
@@ -138,10 +145,10 @@ function parseFirestoreDocument(doc) {
   return { id, ...parsed };
 }
 
-async function fetchCollection(projectId, apiKey, collectionName) {
+async function fetchCollection(projectId, apiKey, collectionName, authToken = "") {
   const rows = [];
   let pageToken = "";
-  let hasRetriedFromFirstPage = false;
+  let invalidPageTokenRecoveryCount = 0;
 
   while (true) {
     const url = new URL(
@@ -158,15 +165,18 @@ async function fetchCollection(projectId, apiKey, collectionName) {
     let payload;
 
     try {
-      payload = await fetchJsonWithRetry(url, collectionName);
+      payload = await fetchJsonWithRetry(url, collectionName, authToken);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
 
-      if (!hasRetriedFromFirstPage && message.includes("Invalid page token")) {
+      if (
+        message.includes("Invalid page token") &&
+        invalidPageTokenRecoveryCount < MAX_INVALID_PAGE_TOKEN_RECOVERY
+      ) {
         console.log("Token pagination kedaluwarsa. Mengulang fetch dari halaman pertama...");
         rows.length = 0;
         pageToken = "";
-        hasRetriedFromFirstPage = true;
+        invalidPageTokenRecoveryCount += 1;
         continue;
       }
 
@@ -240,23 +250,74 @@ function buildRecapRows(users, attendanceRows) {
     const user = usersByNim.get(nim);
     const attendance = attendanceByNim.get(nim);
 
-    const presensiAwalAt = toIsoDateString(attendance?.presensiAwalAt ?? attendance?.checkInAt);
-    const presensiAkhirAt = toIsoDateString(attendance?.presensiAkhirAt ?? attendance?.checkOutAt);
+    const presensiAwalAt = toIsoDateString(
+      attendance?.presensiAwalAt
+      ?? attendance?.checkInAt
+      ?? attendance?.phases?.awal?.at
+      ?? user?.presensiAwalAt
+      ?? user?.checkInAt,
+    );
+    const presensiAkhirAt = toIsoDateString(
+      attendance?.presensiAkhirAt
+      ?? attendance?.checkOutAt
+      ?? attendance?.phases?.akhir?.at
+      ?? user?.presensiAkhirAt
+      ?? user?.checkOutAt,
+    );
+    const presensiAwalProofUrl = String(
+      attendance?.presensiAwalProofUrl
+      ?? attendance?.checkInProofUrl
+      ?? attendance?.phases?.awal?.proofUrl
+      ?? user?.presensiAwalProofUrl
+      ?? user?.checkInProofUrl
+      ?? "",
+    );
+    const presensiAkhirProofUrl = String(
+      attendance?.presensiAkhirProofUrl
+      ?? attendance?.checkOutProofUrl
+      ?? attendance?.phases?.akhir?.proofUrl
+      ?? user?.presensiAkhirProofUrl
+      ?? user?.checkOutProofUrl
+      ?? "",
+    );
+
+    const statusHearing = Boolean(
+      attendance?.statusHearing
+      ?? attendance?.status_hearing
+      ?? attendance?.hearingSummary?.isStatusHearing
+      ?? user?.statusHearing
+      ?? user?.status_hearing,
+    );
+
+    const classification = String(
+      attendance?.classification
+      ?? attendance?.hearingSummary?.classification
+      ?? user?.hearingClassification
+      ?? (statusHearing ? "dari_users_doc" : ""),
+    );
+
+    const hasAnyHearingData = Boolean(
+      attendance
+      || presensiAwalAt
+      || presensiAkhirAt
+      || presensiAwalProofUrl
+      || presensiAkhirProofUrl,
+    );
 
     const row = {
       nim,
       angkatan: user?.angkatan == null ? "" : String(user.angkatan),
       email: String(attendance?.email ?? user?.email ?? user?.voterEmail ?? ""),
       uid: String(attendance?.uid ?? user?.uid ?? user?.voterUid ?? ""),
-      statusHearing: Boolean(attendance?.statusHearing ?? attendance?.status_hearing),
-      classification: String(attendance?.classification ?? ""),
+      statusHearing,
+      classification,
       presensiAwalAt,
       presensiAkhirAt,
-      presensiAwalProofUrl: String(attendance?.presensiAwalProofUrl ?? attendance?.checkInProofUrl ?? ""),
-      presensiAkhirProofUrl: String(attendance?.presensiAkhirProofUrl ?? attendance?.checkOutProofUrl ?? ""),
+      presensiAwalProofUrl,
+      presensiAkhirProofUrl,
       sudahVote: Boolean(user?.sudahVote ?? user?.sudah_vote),
       bobotSuara: Number(user?.bobotSuara ?? 1),
-      hasAttendanceDoc: Boolean(attendance),
+      hasAttendanceDoc: hasAnyHearingData,
       hasUserDoc: Boolean(user),
       attendanceDocId: String(attendance?.id ?? ""),
       userDocId: String(user?.id ?? ""),
@@ -309,6 +370,7 @@ async function main() {
 
   const apiKey = env.NEXT_PUBLIC_FIREBASE_API_KEY;
   const projectId = env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const firebaseIdToken = env.FIREBASE_ID_TOKEN?.trim() ?? "";
 
   if (!apiKey || !projectId) {
     throw new Error(
@@ -317,10 +379,33 @@ async function main() {
   }
 
   console.log("Mengambil data users...");
-  const users = await fetchCollection(projectId, apiKey, "users");
+  const users = await fetchCollection(projectId, apiKey, "users", firebaseIdToken);
 
   console.log("Mengambil data hearing_attendance...");
-  const attendanceRows = await fetchCollection(projectId, apiKey, "hearing_attendance");
+  let attendanceRows = [];
+
+  try {
+    attendanceRows = await fetchCollection(projectId, apiKey, "hearing_attendance", firebaseIdToken);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const isPermissionDenied =
+      message.includes("PERMISSION_DENIED") ||
+      message.includes("Missing or insufficient permissions");
+
+    if (!isPermissionDenied) {
+      throw error;
+    }
+
+    console.warn(
+      "Akses hearing_attendance ditolak oleh Firestore Rules. Lanjutkan export memakai fallback data users.",
+    );
+
+    if (!firebaseIdToken) {
+      console.warn(
+        "Tip: set FIREBASE_ID_TOKEN (akun admin) di .env.local untuk recap hearing lengkap termasuk detail presensi.",
+      );
+    }
+  }
 
   const rows = buildRecapRows(users, attendanceRows);
   const summary = makeSummary(rows);

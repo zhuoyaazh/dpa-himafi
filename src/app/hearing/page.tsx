@@ -14,6 +14,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import { normalizeNim } from "@/lib/voter-identity";
@@ -361,6 +362,23 @@ export default function HearingPage() {
               : "tidak_valid";
 
         const isStatusHearing = hasPresensiAwal && hasPresensiAkhir;
+        const phasePayload = phase === "presensiAwal"
+          ? {
+              presensiAwalAt: serverTimestamp(),
+              presensiAwalProofUrl: proofUrl,
+              presensiAwalTokenUsed: trimmedToken,
+              checkInAt: serverTimestamp(),
+              checkInProofUrl: proofUrl,
+              checkInTokenUsed: trimmedToken,
+            }
+          : {
+              presensiAkhirAt: serverTimestamp(),
+              presensiAkhirProofUrl: proofUrl,
+              presensiAkhirTokenUsed: trimmedToken,
+              checkOutAt: serverTimestamp(),
+              checkOutProofUrl: proofUrl,
+              checkOutTokenUsed: trimmedToken,
+            };
 
         transaction.set(
           attendanceRef,
@@ -371,28 +389,79 @@ export default function HearingPage() {
             statusHearing: isStatusHearing,
             status_hearing: isStatusHearing,
             classification,
+            hearingSummary: {
+              hasPresensiAwal,
+              hasPresensiAkhir,
+              classification,
+              isStatusHearing,
+            },
+            phases: {
+              ...(phase === "presensiAwal"
+                ? {
+                    awal: {
+                      at: serverTimestamp(),
+                      proofUrl,
+                      tokenUsed: trimmedToken,
+                    },
+                  }
+                : {
+                    akhir: {
+                      at: serverTimestamp(),
+                      proofUrl,
+                      tokenUsed: trimmedToken,
+                    },
+                  }),
+            },
             updatedAt: serverTimestamp(),
-            ...(phase === "presensiAwal"
-              ? {
-                  presensiAwalAt: serverTimestamp(),
-                  presensiAwalProofUrl: proofUrl,
-                  presensiAwalTokenUsed: trimmedToken,
-                  checkInAt: serverTimestamp(),
-                  checkInProofUrl: proofUrl,
-                  checkInTokenUsed: trimmedToken,
-                }
-              : {
-                  presensiAkhirAt: serverTimestamp(),
-                  presensiAkhirProofUrl: proofUrl,
-                  presensiAkhirTokenUsed: trimmedToken,
-                  checkOutAt: serverTimestamp(),
-                  checkOutProofUrl: proofUrl,
-                  checkOutTokenUsed: trimmedToken,
-                }),
+            ...phasePayload,
           },
           { merge: true },
         );
+
       });
+
+      // Best effort sync to users doc so recap can use users fallback data.
+      // This must not block attendance submission if users write is denied by rules.
+      try {
+        const latestAttendanceSnapshot = await getDoc(attendanceRef);
+        const latestAttendance = latestAttendanceSnapshot.data() as HearingAttendance | undefined;
+
+        const hasPresensiAwal = Boolean(latestAttendance?.presensiAwalAt ?? latestAttendance?.checkInAt);
+        const hasPresensiAkhir = Boolean(latestAttendance?.presensiAkhirAt ?? latestAttendance?.checkOutAt);
+
+        const classification = hasPresensiAwal && hasPresensiAkhir
+          ? "awal_akhir"
+          : hasPresensiAwal
+            ? "awal_only"
+            : hasPresensiAkhir
+              ? "akhir_only"
+              : "tidak_valid";
+
+        const isStatusHearing = hasPresensiAwal && hasPresensiAkhir;
+
+        await setDoc(
+          doc(db, "users", nimFromEmail),
+          {
+            nim: nimFromEmail,
+            statusHearing: isStatusHearing,
+            status_hearing: isStatusHearing,
+            hearingClassification: classification,
+            hearingUpdatedAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            presensiAwalAt: latestAttendance?.presensiAwalAt ?? latestAttendance?.checkInAt ?? null,
+            presensiAkhirAt: latestAttendance?.presensiAkhirAt ?? latestAttendance?.checkOutAt ?? null,
+            presensiAwalProofUrl: latestAttendance?.presensiAwalProofUrl ?? latestAttendance?.checkInProofUrl ?? "",
+            presensiAkhirProofUrl: latestAttendance?.presensiAkhirProofUrl ?? latestAttendance?.checkOutProofUrl ?? "",
+            checkInAt: latestAttendance?.checkInAt ?? latestAttendance?.presensiAwalAt ?? null,
+            checkOutAt: latestAttendance?.checkOutAt ?? latestAttendance?.presensiAkhirAt ?? null,
+            checkInProofUrl: latestAttendance?.checkInProofUrl ?? latestAttendance?.presensiAwalProofUrl ?? "",
+            checkOutProofUrl: latestAttendance?.checkOutProofUrl ?? latestAttendance?.presensiAkhirProofUrl ?? "",
+          },
+          { merge: true },
+        );
+      } catch {
+        // Ignore users sync failure to keep attendance flow reliable.
+      }
 
       setProofFile(null);
       setToken("");
