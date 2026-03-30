@@ -109,11 +109,16 @@ export async function submitVote(payload: SubmitVotePayload) {
     throw new Error(voterIdentityError);
   }
 
+  const voterEmail = currentUser.email;
+  if (!voterEmail) {
+    throw new Error("Email akun tidak ditemukan. Silakan login ulang.");
+  }
+
   const context: SubmitVoteContext = {
     sanitizedNim,
     candidateId: payload.candidateId,
     voterUid: currentUser.uid,
-    voterEmail: currentUser.email,
+    voterEmail,
   };
 
   try {
