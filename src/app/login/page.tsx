@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -13,6 +14,7 @@ import {
   nimToCampusEmail,
   PRIMARY_CAMPUS_EMAIL_DOMAIN,
 } from "@/lib/voter-identity";
+import { ToastContainer, useToast } from "@/components/toast-notification";
 
 function resolveLoginEmail(identifier: string) {
   const trimmedIdentifier = identifier.trim().toLowerCase();
@@ -52,6 +54,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const { toasts, addToast, removeToast } = useToast();
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -69,17 +72,23 @@ export default function LoginPage() {
     const cleanPassword = password.trim();
 
     if (!loginEmail) {
-      setMessage("NIM atau email ITB wajib diisi dengan format yang valid.");
+      const text = "NIM atau email ITB wajib diisi dengan format yang valid.";
+      setMessage(text);
+      addToast(text, "warning");
       return;
     }
 
     if (!cleanPassword) {
-      setMessage("Password wajib diisi.");
+      const text = "Password wajib diisi.";
+      setMessage(text);
+      addToast(text, "warning");
       return;
     }
 
     if (!isCampusEmail(loginEmail)) {
-      setMessage("Gunakan NIM atau email ITB yang valid.");
+      const text = "Gunakan NIM atau email ITB yang valid.";
+      setMessage(text);
+      addToast(text, "warning");
       return;
     }
 
@@ -89,9 +98,12 @@ export default function LoginPage() {
       setMessage("Memproses login...");
       await signInWithEmailAndPassword(auth, loginEmail, cleanPassword);
       setMessage("Login berhasil.");
+      addToast("Login berhasil.", "success");
     } catch (error) {
       const text = error instanceof Error ? error.message : "Login gagal.";
-      setMessage(mapLoginError(text));
+      const mappedError = mapLoginError(text);
+      setMessage(mappedError);
+      addToast(mappedError, "error");
     } finally {
       setIsSigningIn(false);
     }
@@ -107,9 +119,11 @@ export default function LoginPage() {
       const auth = getFirebaseAuth();
       await signOut(auth);
       setMessage("Logout berhasil.");
+      addToast("Logout berhasil.", "success");
     } catch (error) {
       const text = error instanceof Error ? error.message : "Logout gagal.";
       setMessage(text);
+      addToast(text, "error");
     }
   }
 
@@ -119,8 +133,8 @@ export default function LoginPage() {
         <p className="section-kicker">Exclusive Entry</p>
         <h1 className="section-title">Login / Logout</h1>
         <p className="max-w-2xl text-sm text-foreground/75">
-        Login diperlukan untuk submit voting. Halaman lain tetap bisa diakses
-        tanpa login. Gunakan akun kampus ITB dengan format email NIM.
+          Login diperlukan untuk submit voting. Halaman lain tetap bisa diakses
+          tanpa login. Gunakan akun kampus ITB dengan format email NIM.
         </p>
       </header>
 
@@ -159,14 +173,14 @@ export default function LoginPage() {
                     aria-label={showPassword ? "Sembunyikan password" : "Lihat password"}
                     title={showPassword ? "Sembunyikan password" : "Lihat password"}
                   >
-                    {showPassword ? "🙈" : "👁️"}
+                    {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
               </label>
               <div className="min-w-0 overflow-hidden rounded-2xl border border-[--gold-soft] bg-white/60 p-4 text-foreground/75">
                 <p className="subtitle-strong">Format Login</p>
-                <p className="mt-2 break-words text-sm">
-                Login menggunakan NIM atau email ITB
+                <p className="mt-2 wrap-break-word text-sm">
+                  Login menggunakan NIM atau email ITB
                 </p>
                 <div className="mt-1 w-full min-w-0 overflow-x-auto">
                   <p className="whitespace-nowrap text-sm">
@@ -184,6 +198,12 @@ export default function LoginPage() {
               >
                 {isSigningIn ? "Memproses..." : "Login dengan NIM + Password"}
               </button>
+              <Link
+                href="/reset-password-chat"
+                className="button-outline inline-flex w-full items-center justify-center sm:w-fit"
+              >
+                Lupa Password? Chat Admin Recovery
+              </Link>
             </div>
           </form>
         ) : null}
@@ -213,8 +233,10 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        <p className="break-words text-foreground/80">Status: {message || "-"}</p>
+        <p className="wrap-break-word text-foreground/80">Status: {message || "-"}</p>
       </div>
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </section>
   );
 }

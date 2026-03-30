@@ -307,16 +307,14 @@ function buildRecapRows(users, attendanceRows) {
     const row = {
       nim,
       angkatan: user?.angkatan == null ? "" : String(user.angkatan),
-      email: String(attendance?.email ?? user?.email ?? user?.voterEmail ?? ""),
-      uid: String(attendance?.uid ?? user?.uid ?? user?.voterUid ?? ""),
+      email: String(attendance?.email ?? user?.email ?? ""),
+      uid: String(attendance?.uid ?? user?.uid ?? ""),
       statusHearing,
       classification,
       presensiAwalAt,
       presensiAkhirAt,
       presensiAwalProofUrl,
       presensiAkhirProofUrl,
-      sudahVote: Boolean(user?.sudahVote ?? user?.sudah_vote),
-      bobotSuara: Number(user?.bobotSuara ?? 1),
       hasAttendanceDoc: hasAnyHearingData,
       hasUserDoc: Boolean(user),
       attendanceDocId: String(attendance?.id ?? ""),
@@ -408,6 +406,7 @@ async function main() {
   }
 
   const rows = buildRecapRows(users, attendanceRows);
+  const attendanceOnlyRows = rows.filter((row) => row.hasAttendanceDoc);
   const summary = makeSummary(rows);
 
   const outputDir = path.join(cwd, DEFAULT_OUTPUT_DIR);
@@ -416,6 +415,8 @@ async function main() {
   const stamp = getTimestampToken();
   const jsonPath = path.join(outputDir, `hearing-recap-${stamp}.json`);
   const csvPath = path.join(outputDir, `hearing-recap-${stamp}.csv`);
+  const attendanceOnlyJsonPath = path.join(outputDir, `hearing-attendance-only-${stamp}.json`);
+  const attendanceOnlyCsvPath = path.join(outputDir, `hearing-attendance-only-${stamp}.csv`);
 
   const columns = [
     "nim",
@@ -428,8 +429,6 @@ async function main() {
     "presensiAkhirAt",
     "presensiAwalProofUrl",
     "presensiAkhirProofUrl",
-    "sudahVote",
-    "bobotSuara",
     "hasAttendanceDoc",
     "hasUserDoc",
     "attendanceDocId",
@@ -449,12 +448,34 @@ async function main() {
     "utf8",
   );
 
+  await writeFile(
+    attendanceOnlyJsonPath,
+    JSON.stringify(
+      {
+        summary: {
+          totalBarisRekap: attendanceOnlyRows.length,
+          generatedAt: new Date().toISOString(),
+          source: `hearing-recap-${stamp}`,
+        },
+        rows: attendanceOnlyRows,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+
   const csv = toCsv(rows, columns);
   await writeFile(csvPath, csv, "utf8");
+
+  const attendanceOnlyCsv = toCsv(attendanceOnlyRows, columns);
+  await writeFile(attendanceOnlyCsvPath, attendanceOnlyCsv, "utf8");
 
   console.log("Rekap hearing berhasil dibuat.");
   console.log(`JSON: ${jsonPath}`);
   console.log(`CSV : ${csvPath}`);
+  console.log(`JSON (attendance only): ${attendanceOnlyJsonPath}`);
+  console.log(`CSV  (attendance only): ${attendanceOnlyCsvPath}`);
   console.log("Ringkasan:");
   console.log(JSON.stringify(summary, null, 2));
 }

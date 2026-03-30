@@ -8,12 +8,14 @@ import { getFirebaseAuth, db } from "@/lib/firebase";
 
 const primaryMenuItems = [
   { href: "/", label: "Dashboard" },
+  { href: "/dpa", label: "Profil DPA" },
   { href: "/hearing", label: "Presensi Hearing" },
   { href: "/calon", label: "Profil Calon" },
   { href: "/voting", label: "Voting" },
   { href: "/hasil", label: "Hasil Voting" },
   { href: "/profile", label: "Cek Status" },
   { href: "/profil", label: "Profil User" },
+  { href: "/bantuan", label: "Bantuan & Chat" },
   { href: "/setting", label: "Setting" },
 ];
 
@@ -147,6 +149,16 @@ export function MainNavbar() {
             </ul>
 
             <div className="mt-auto grid gap-3 pt-8 text-sm">
+              {isAdmin ? (
+                <Link
+                  href="/admin/support"
+                  onClick={closeMenu}
+                  className="button-outline inline-flex w-full items-center justify-center"
+                >
+                  Admin Support
+                </Link>
+              ) : null}
+
               <Link
                 href="/admin"
                 onClick={closeMenu}

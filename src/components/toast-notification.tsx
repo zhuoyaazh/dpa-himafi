@@ -52,7 +52,7 @@ function Toast({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => vo
   const bgColorClass = {
     success: "bg-green-50 border-green-200 text-green-900",
     error: "bg-red-50 border-red-200 text-red-900",
-    info: "bg-blue-50 border-blue-200 text-blue-900",
+    info: "bg-[rgb(255_250_240/0.95)] border-[--gold-soft] text-[--maroon]",
     warning: "bg-yellow-50 border-yellow-200 text-yellow-900",
   }[toast.type];
 
@@ -66,7 +66,7 @@ function Toast({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => vo
   const iconColorClass = {
     success: "text-green-600",
     error: "text-red-600",
-    info: "text-blue-600",
+    info: "text-[--maroon]",
     warning: "text-yellow-600",
   }[toast.type];
 

@@ -149,7 +149,13 @@ service cloud.firestore {
     }
 
     match /admin_users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if
+        request.auth != null &&
+        (
+          request.auth.uid == uid ||
+          request.auth.token.email == uid ||
+          request.auth.token.email.matches('^' + uid + '[^@]*@([a-zA-Z0-9-]+\\.)*itb\\.ac\\.id$')
+        );
       allow write: if false;
     }
 
@@ -196,6 +202,89 @@ service cloud.firestore {
     match /site_settings/{settingId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
+    }
+
+    match /support_threads/{threadId} {
+      allow create: if
+        request.auth != null &&
+        request.resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.requesterEmail == request.auth.token.email &&
+        request.resource.data.status == "open";
+
+      allow read: if
+        isAdmin() ||
+        (request.auth != null && resource.data.requesterUid == request.auth.uid);
+
+      allow update: if
+        isAdmin() ||
+        (request.auth != null && resource.data.requesterUid == request.auth.uid);
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if
+          isAdmin() ||
+          (
+            request.auth != null &&
+            get(/databases/$(database)/documents/support_threads/$(threadId)).data.requesterUid == request.auth.uid
+          );
+
+        allow create: if
+          (
+            isAdmin() &&
+            request.auth != null &&
+            request.resource.data.senderRole == "admin" &&
+            request.resource.data.senderEmail == request.auth.token.email
+          ) ||
+          (
+            request.auth != null &&
+            get(/databases/$(database)/documents/support_threads/$(threadId)).data.requesterUid == request.auth.uid &&
+            request.resource.data.senderRole == "user" &&
+            request.resource.data.senderUid == request.auth.uid &&
+            request.resource.data.senderEmail == request.auth.token.email
+          );
+
+        allow update, delete: if false;
+      }
+    }
+
+    match /password_reset_chats/{chatId} {
+      allow create: if
+        request.resource.data.requesterNim is string &&
+        request.resource.data.requesterEmail is string &&
+        request.resource.data.status in ["open", "in_review", "resolved"];
+
+      allow get: if true;
+      allow list: if isAdmin();
+
+      allow update: if
+        isAdmin() ||
+        (
+          request.resource.data.requesterNim == resource.data.requesterNim &&
+          request.resource.data.requesterEmail == resource.data.requesterEmail &&
+          request.resource.data.lastSenderRole == "user" &&
+          request.resource.data.status in ["open", "in_review", "resolved"]
+        );
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get, list: if true;
+
+        allow create: if
+          (
+            isAdmin() &&
+            request.auth != null &&
+            request.resource.data.senderRole == "admin" &&
+            request.resource.data.senderEmail == request.auth.token.email
+          ) ||
+          (
+            request.resource.data.senderRole == "user" &&
+            request.resource.data.senderEmail is string
+          );
+
+        allow update, delete: if false;
+      }
     }
 
     match /user_profiles/{uid} {
