@@ -2,20 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { CANDIDATES } from "@/lib/candidates";
 import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebase";
+import { db, getFirebaseAuth } from "@/lib/firebase";
+import { CANDIDATES } from "@/lib/candidates";
 
 type VoteRow = {
   candidateId?: string;
   bobotSuara?: number;
 };
 
+type UserRow = {
+  sudahVote?: boolean;
+};
+
 export default function HasilPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [votes, setVotes] = useState<VoteRow[]>([]);
+  const [notVotedCount, setNotVotedCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showCandidateBreakdownPublic, setShowCandidateBreakdownPublic] = useState(false);
 
@@ -25,10 +29,18 @@ export default function HasilPage() {
         setIsLoading(true);
         setErrorMessage("");
 
-        const snapshot = await getDocs(collection(db, "suara_masuk"));
-        setVotes(snapshot.docs.map((doc) => doc.data() as VoteRow));
-      } catch {
-        setErrorMessage("Gagal memuat hasil voting.");
+        const voteSnapshot = await getDocs(collection(db, "suara_masuk"));
+        setVotes(voteSnapshot.docs.map((row) => row.data() as VoteRow));
+
+        const userSnapshot = await getDocs(collection(db, "users"));
+        const belumVoteCount = userSnapshot.docs.reduce((accumulator, row) => {
+          const data = row.data() as UserRow;
+          return accumulator + (data.sudahVote === true ? 0 : 1);
+        }, 0);
+        setNotVotedCount(belumVoteCount);
+      } catch (error) {
+        console.error("Error loading results:", error);
+        setErrorMessage("Gagal memuat hasil voting. Coba refresh halaman.");
       } finally {
         setIsLoading(false);
       }
@@ -75,10 +87,19 @@ export default function HasilPage() {
     try {
       setIsLoading(true);
       setErrorMessage("");
-      const snapshot = await getDocs(collection(db, "suara_masuk"));
-      setVotes(snapshot.docs.map((doc) => doc.data() as VoteRow));
-    } catch {
-      setErrorMessage("Gagal memuat hasil voting.");
+
+      const voteSnapshot = await getDocs(collection(db, "suara_masuk"));
+      setVotes(voteSnapshot.docs.map((row) => row.data() as VoteRow));
+
+      const userSnapshot = await getDocs(collection(db, "users"));
+      const belumVoteCount = userSnapshot.docs.reduce((accumulator, row) => {
+        const data = row.data() as UserRow;
+        return accumulator + (data.sudahVote === true ? 0 : 1);
+      }, 0);
+      setNotVotedCount(belumVoteCount);
+    } catch (error) {
+      console.error("Error refreshing results:", error);
+      setErrorMessage("Gagal memuat hasil voting. Coba refresh halaman.");
     } finally {
       setIsLoading(false);
     }
@@ -109,6 +130,7 @@ export default function HasilPage() {
   }, [votes]);
 
   const totalVoters = votes.length;
+  const invalidVotes = notVotedCount;
   const totalWeight = summary.reduce(
     (accumulator, candidate) => accumulator + candidate.weightedVotes,
     0,
@@ -125,7 +147,6 @@ export default function HasilPage() {
         <p className="section-kicker">Result Tableau</p>
         <h1 className="section-title">Hasil Voting</h1>
         <p className="max-w-3xl text-sm text-foreground/75">
-          Rekap ini menampilkan akumulasi suara anonim berdasarkan kandidat dan bobot hearing.
         </p>
         <button
           type="button"
@@ -137,17 +158,22 @@ export default function HasilPage() {
         </button>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="gold-card p-5">
-          <p className="subtitle-strong">Total Pemilih</p>
-          <p className="font-display mt-3 text-4xl text-[--maroon]">{totalVoters}</p>
+          <p className="subtitle-strong text-xs sm:text-sm">Total Pemilih</p>
+          <p className="font-display mt-3 text-3xl text-[--maroon] sm:text-4xl">{totalVoters}</p>
         </div>
         <div className="gold-card p-5">
-          <p className="subtitle-strong">Total Bobot Suara</p>
-          <p className="font-display mt-3 text-4xl text-[--maroon]">{totalWeight}</p>
+          <p className="subtitle-strong text-xs sm:text-sm">Total Bobot Suara</p>
+          <p className="font-display mt-3 text-3xl text-[--maroon] sm:text-4xl">{totalWeight}</p>
         </div>
         <div className="gold-card p-5">
-          <p className="subtitle-strong">Status</p>
+          <p className="subtitle-strong text-xs sm:text-sm">Total Belum Vote</p>
+          <p className="font-display mt-3 text-3xl text-[--maroon] sm:text-4xl">{invalidVotes}</p>
+          <p className="mt-2 text-xs text-foreground/60">Berubah saat user submit vote.</p>
+        </div>
+        <div className="gold-card p-5">
+          <p className="subtitle-strong text-xs sm:text-sm">Status</p>
           <p className="mt-3 text-sm text-foreground/75">
             {isLoading ? "Memuat rekap suara..." : errorMessage || "Rekap berhasil dimuat."}
           </p>
@@ -157,7 +183,7 @@ export default function HasilPage() {
       {topCandidate && canViewCandidateBreakdown ? (
         <section className="gold-card overflow-hidden p-6">
           <p className="subtitle-strong">Peringkat Sementara</p>
-          <h2 className="font-display mt-2 break-words text-3xl text-[--maroon]">
+          <h2 className="font-display mt-2 wrap-break-word text-3xl text-[--maroon]">
             {topCandidate.name} memimpin dengan bobot {topCandidate.weightedVotes}
           </h2>
           <p className="mt-2 text-sm text-foreground/75">
@@ -167,18 +193,17 @@ export default function HasilPage() {
       ) : null}
 
       {canViewCandidateBreakdown ? (
-        <div className="grid gap-5 lg:grid-cols-2">
-          {sortedSummary.map((candidate, index) => {
-            return (
+        <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-2">
+          {sortedSummary.map((candidate, index) => (
             <article key={candidate.id} className="gold-card overflow-hidden p-6">
-              <div className={`rounded-3xl bg-gradient-to-br ${candidate.accent} p-5 text-[#fffaf0]`}>
+              <div className={`rounded-3xl bg-linear-to-br ${candidate.accent} p-5 text-[#fffaf0]`}>
                 <div className="flex min-w-0 items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-bold uppercase tracking-[0.3em] opacity-80">
                       Rank #{index + 1} · Candidate {candidate.ballotNumber}
                     </p>
-                    <h2 className="font-display mt-3 break-words text-4xl">{candidate.name}</h2>
-                    <p className="mt-2 break-words text-sm opacity-85">{candidate.title}</p>
+                    <h2 className="font-display mt-3 wrap-break-word text-4xl">{candidate.name}</h2>
+                    <p className="mt-2 wrap-break-word text-sm opacity-85">{candidate.title}</p>
                   </div>
                   <span className="font-display shrink-0 text-4xl">{candidate.suit}</span>
                 </div>
@@ -213,8 +238,7 @@ export default function HasilPage() {
                 </div>
               </div>
             </article>
-            );
-          })}
+          ))}
         </div>
       ) : (
         <section className="gold-card overflow-hidden p-6">

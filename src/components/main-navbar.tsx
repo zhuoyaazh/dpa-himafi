@@ -7,7 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { getFirebaseAuth, db } from "@/lib/firebase";
 
 const primaryMenuItems = [
-  { href: "/", label: "Dashboard" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/dpa", label: "Profil DPA" },
   { href: "/hearing", label: "Presensi Hearing" },
   { href: "/calon", label: "Profil Calon" },
@@ -77,7 +77,7 @@ export function MainNavbar() {
         <nav className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <Link href="/" className="flex items-center gap-3">
+              <Link href="/dashboard" className="flex items-center gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/LOGO_DPA_FIX.png"

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { submitVote } from "@/lib/voting";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import {
@@ -12,8 +12,10 @@ import {
 } from "@/lib/voter-identity";
 import { CANDIDATES } from "@/lib/candidates";
 import { useToast, ToastContainer } from "@/components/toast-notification";
+import { useVotingCountdown } from "@/lib/voting-countdown";
 
 export default function VotingPage() {
+  const countdown = useVotingCountdown();
   const [user, setUser] = useState<User | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [candidateId, setCandidateId] = useState(CANDIDATES[0].id);
@@ -60,6 +62,30 @@ export default function VotingPage() {
     void loadVotingGate();
   }, []);
 
+  // Auto-close voting gate at 23:59
+  useEffect(() => {
+    if (countdown.isExpired && isVotingOpen) {
+      async function autoCloseVotingGate() {
+        try {
+          await setDoc(
+            doc(db, "site_settings", "voting_gate"),
+            {
+              isOpen: false,
+              autoClosedAt: serverTimestamp(),
+              closedReason: "Auto-closed at 23:59",
+            },
+            { merge: true }
+          );
+          setIsVotingOpen(false);
+          addToast("Voting otomatis ditutup pada jam 23:59. Terima kasih!", "info");
+        } catch (error) {
+          console.error("Failed to auto-close voting gate:", error);
+        }
+      }
+      void autoCloseVotingGate();
+    }
+  }, [countdown.isExpired, isVotingOpen, addToast]);
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -95,7 +121,6 @@ export default function VotingPage() {
       setIsSubmitting(true);
       const loadingMsg = "Mengirim suara...";
       setStatusMessage(loadingMsg);
-      addToast(loadingMsg, "info");
 
       await submitVote({
         nim: derivedNim,

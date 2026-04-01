@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CANDIDATES } from "@/lib/candidates";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { normalizeNim } from "@/lib/voter-identity";
+import { useVotingCountdown } from "@/lib/voting-countdown";
 
 type ImportantInfo = {
   title: string;
@@ -56,12 +58,15 @@ function getNimFromEmail(email: string | null | undefined) {
 }
 
 export default function Home() {
+  const router = useRouter();
+  const countdown = useVotingCountdown();
   const [importantInfo, setImportantInfo] = useState<ImportantInfo | null>(null);
   const [votes, setVotes] = useState<VoteRow[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showCandidateBreakdownPublic, setShowCandidateBreakdownPublic] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [nickName, setNickName] = useState("");
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
 
   useEffect(() => {
     async function loadImportantInfo() {
@@ -126,10 +131,12 @@ export default function Home() {
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setCurrentUser(currentUser);
+      setIsAuthResolved(true);
 
       if (!currentUser) {
         setIsAdmin(false);
         setNickName("");
+        router.replace("/login");
         return;
       }
 
@@ -152,7 +159,7 @@ export default function Home() {
     });
 
     return unsubscribe;
-  }, []);
+  }, [router]);
 
   const canViewCandidateBreakdown = isAdmin || showCandidateBreakdownPublic;
   const greetingName = nickName || getNimFromEmail(currentUser?.email) || "Sobat HIMAFI";
@@ -174,6 +181,14 @@ export default function Home() {
       return { ...c, voteCount: candidateVotes.length, weightedVotes, percentage };
     });
   }, [votes]);
+
+  if (!isAuthResolved) {
+    return (
+      <section className="page-shell">
+        <div className="gold-card p-6 text-sm text-foreground/75">Memeriksa sesi login...</div>
+      </section>
+    );
+  }
 
   return (
     <section className="page-shell">
@@ -213,6 +228,38 @@ export default function Home() {
       </header>
 
       <article className="gold-card overflow-hidden p-6">
+        <p className="subtitle-strong">Status Voting</p>
+        <h2 className="mt-2 font-display text-3xl text-[--maroon]">Countdown Penutupan</h2>
+        {countdown.isExpired ? (
+          <div className="mt-4 rounded-2xl border border-[--gold-soft] bg-[linear-gradient(120deg,rgba(56,6,9,0.08),rgba(212,175,55,0.12))] p-4">
+            <p className="text-sm font-semibold text-[--maroon]">Voting telah ditutup pada jam 23:59.</p>
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="rounded-2xl border border-[--gold-soft] bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(244,241,232,0.85))] p-3 text-center shadow-sm sm:p-4">
+              <p className="text-2xl font-bold tabular-nums text-[--maroon] sm:text-4xl" style={{ minWidth: "50px" }}>
+                {String(countdown.hours).padStart(2, "0")}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-foreground/60">Jam</p>
+            </div>
+            <div className="rounded-2xl border border-[--gold-soft] bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(244,241,232,0.85))] p-3 text-center shadow-sm sm:p-4">
+              <p className="text-2xl font-bold tabular-nums text-[--maroon] sm:text-4xl" style={{ minWidth: "50px" }}>
+                {String(countdown.minutes).padStart(2, "0")}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-foreground/60">Menit</p>
+            </div>
+            <div className="rounded-2xl border border-[--gold-soft] bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(244,241,232,0.85))] p-3 text-center shadow-sm sm:p-4">
+              <p className="text-2xl font-bold tabular-nums text-[--maroon] sm:text-4xl" style={{ minWidth: "50px" }}>
+                {String(countdown.seconds).padStart(2, "0")}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-foreground/60">Detik</p>
+            </div>
+          </div>
+        )}
+        <p className="mt-3 text-xs text-foreground/60">Voting akan ditutup otomatis pada 23:59 hari ini.</p>
+      </article>
+
+      <article className="gold-card overflow-hidden p-6">
         <p className="subtitle-strong">Informasi Penting</p>
         <h2 className="mt-2 font-display text-3xl text-[--maroon]">
           {importantInfo?.title ?? "Informasi Penting"}
@@ -240,21 +287,21 @@ export default function Home() {
         </div>
 
         {canViewCandidateBreakdown ? (
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 space-y-2 sm:space-y-3">
             {voteSummary.map((candidate, index) => {
               const fill = candidate.percentage <= 0 ? 0 : Math.min(Math.max(candidate.percentage, 4), 100);
 
               return (
                 <div key={candidate.id}>
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-[--maroon]">
+                  <div className="mb-1 flex items-center justify-between text-xs sm:text-sm">
+                    <span className="font-semibold text-[--maroon] min-w-0">
                       {candidate.ballotNumber}. {candidate.name}
                     </span>
-                    <span className="text-foreground/70">
-                      {candidate.percentage.toFixed(1)}% · {candidate.weightedVotes} bobot
+                    <span className="text-foreground/70 shrink-0 ml-2">
+                      {candidate.percentage.toFixed(1)}% · {candidate.weightedVotes}
                     </span>
                   </div>
-                  <div className="h-3 overflow-hidden rounded-full bg-[rgb(196_154_108/0.18)]">
+                  <div className="h-2 sm:h-3 overflow-hidden rounded-full bg-[rgb(196_154_108/0.18)]">
                     <div
                       className="h-full rounded-full transition-[width] duration-500 ease-out"
                       style={{

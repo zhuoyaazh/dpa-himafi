@@ -226,6 +226,11 @@ iframe {
   @apply mt-1 text-[11px] opacity-75;
 }
 
+.imessage-message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .imessage-composer {
   @apply rounded-[1.25rem] border bg-white/80 p-2;
   border-color: rgb(196 154 108 / 0.4);

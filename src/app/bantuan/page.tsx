@@ -405,7 +405,7 @@ export default function BantuanPage() {
                             }`}
                           >
                             <p className="text-[11px] opacity-80">{message.senderRole === "user" ? "Kamu" : "Admin"}</p>
-                            <p className="wrap-break-word">{message.text}</p>
+                            <p className="imessage-message-text">{message.text}</p>
                             <p className="imessage-meta">{formatTimestamp(message.createdAt)}</p>
                           </div>
                         </div>

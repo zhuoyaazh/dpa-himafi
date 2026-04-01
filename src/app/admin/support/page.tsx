@@ -443,7 +443,7 @@ export default function AdminSupportPage() {
                           }`}
                         >
                           <p className="text-[11px] opacity-80">{message.senderRole === "admin" ? "Admin" : "User"}</p>
-                          <p className="wrap-break-word">{message.text}</p>
+                          <p className="imessage-message-text">{message.text}</p>
                           <p className="imessage-meta">{formatTimestamp(message.createdAt)}</p>
                         </div>
                       </div>

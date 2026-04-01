@@ -10,6 +10,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -80,6 +81,7 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
   const [totalVoteWeight, setTotalVoteWeight] = useState(0);
+  const [totalNotVoted, setTotalNotVoted] = useState(0);
   const [message, setMessage] = useState("");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
@@ -252,12 +254,20 @@ export default function AdminPage() {
 
   useEffect(() => {
     const auth = getFirebaseAuth();
+    let unsubscribeUsers: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (unsubscribeUsers) {
+        unsubscribeUsers();
+        unsubscribeUsers = null;
+      }
+
       setUser(currentUser);
 
       if (!currentUser) {
         setIsAdmin(false);
         setLogs([]);
+        setTotalNotVoted(0);
         setMessage("Login diperlukan untuk membuka panel admin.");
         setIsLoading(false);
         return;
@@ -272,9 +282,22 @@ export default function AdminPage() {
         if (!adminActive) {
           setMessage("Akun ini belum terdaftar sebagai admin aktif.");
           setLogs([]);
+          setTotalNotVoted(0);
           setIsLoading(false);
           return;
         }
+
+        // Realtime: count users who have NOT voted yet.
+        // `sudahVote` can be undefined on old records, and that should be treated as not voted.
+        unsubscribeUsers = onSnapshot(collection(db, "users"), (usersSnapshot) => {
+          const totalUsers = usersSnapshot.size;
+          const totalVoted = usersSnapshot.docs.reduce((accumulator, userDoc) => {
+            const data = userDoc.data() as { sudahVote?: boolean };
+            return accumulator + (data.sudahVote === true ? 1 : 0);
+          }, 0);
+
+          setTotalNotVoted(Math.max(totalUsers - totalVoted, 0));
+        });
 
         const snapshot = await getDocs(
           query(
@@ -308,7 +331,12 @@ export default function AdminPage() {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (unsubscribeUsers) {
+        unsubscribeUsers();
+      }
+    };
   }, [loadAnnouncementHistory, loadHearingSettingsAndHistory, loadResultsVisibility, loadVotingGateSettings]);
 
   async function onToggleVotingGate(nextValue: boolean) {
@@ -772,7 +800,7 @@ export default function AdminPage() {
         <p className="wrap-break-word">Status: {isLoading ? "Memuat..." : message || "-"}</p>
 
         {isAdmin ? (
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
               <p className="subtitle-strong">Total Audit Event</p>
               <p className="font-display mt-2 text-3xl text-[--maroon]">{logs.length}</p>
@@ -784,6 +812,10 @@ export default function AdminPage() {
             <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
               <p className="subtitle-strong">Total Bobot</p>
               <p className="font-display mt-2 text-3xl text-[--maroon]">{totalVoteWeight}</p>
+            </div>
+            <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+              <p className="subtitle-strong">Belum Vote</p>
+              <p className="font-display mt-2 text-3xl text-[--maroon]">{totalNotVoted}</p>
             </div>
           </div>
         ) : null}
