@@ -7,6 +7,21 @@ type CountdownTime = {
   isExpired: boolean;
 };
 
+// Use a fixed deadline so countdown does not roll over to the next day.
+// Can be overridden in env: NEXT_PUBLIC_VOTING_CLOSE_AT=2026-04-01T23:59:59+07:00
+const DEFAULT_VOTING_CLOSE_AT = "2026-04-01T23:59:59+07:00";
+
+function resolveVotingDeadline() {
+  const rawDeadline = process.env.NEXT_PUBLIC_VOTING_CLOSE_AT ?? DEFAULT_VOTING_CLOSE_AT;
+  const parsed = new Date(rawDeadline);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date(DEFAULT_VOTING_CLOSE_AT);
+  }
+
+  return parsed;
+}
+
 export function useVotingCountdown() {
   const [time, setTime] = useState<CountdownTime>({
     hours: 0,
@@ -16,12 +31,12 @@ export function useVotingCountdown() {
   });
 
   useEffect(() => {
+    const deadline = resolveVotingDeadline();
+
     function calculateCountdown() {
       const now = new Date();
-      const today = new Date();
-      today.setHours(23, 59, 59, 999);
 
-      if (now > today) {
+      if (now >= deadline) {
         setTime({
           hours: 0,
           minutes: 0,
@@ -31,8 +46,8 @@ export function useVotingCountdown() {
         return;
       }
 
-      const diff = today.getTime() - now.getTime();
-      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const diff = deadline.getTime() - now.getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff / (1000 * 60)) % 60);
       const seconds = Math.floor((diff / 1000) % 60);
 

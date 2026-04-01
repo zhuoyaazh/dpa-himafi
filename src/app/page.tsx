@@ -232,7 +232,7 @@ export default function Home() {
         <h2 className="mt-2 font-display text-3xl text-[--maroon]">Countdown Penutupan</h2>
         {countdown.isExpired ? (
           <div className="mt-4 rounded-2xl border border-[--gold-soft] bg-[linear-gradient(120deg,rgba(56,6,9,0.08),rgba(212,175,55,0.12))] p-4">
-            <p className="text-sm font-semibold text-[--maroon]">Voting telah ditutup pada jam 23:59.</p>
+            <p className="text-sm font-semibold text-[--maroon]">Voting telah ditutup sesuai jadwal (01 Apr 2026, 23:59 WIB).</p>
           </div>
         ) : (
           <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-4">
@@ -256,7 +256,7 @@ export default function Home() {
             </div>
           </div>
         )}
-        <p className="mt-3 text-xs text-foreground/60">Voting akan ditutup otomatis pada 23:59 hari ini.</p>
+        <p className="mt-3 text-xs text-foreground/60">Voting ditutup otomatis pada 01 Apr 2026, 23:59 WIB.</p>
       </article>
 
       <article className="gold-card overflow-hidden p-6">

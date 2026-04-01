@@ -72,12 +72,12 @@ export default function VotingPage() {
             {
               isOpen: false,
               autoClosedAt: serverTimestamp(),
-              closedReason: "Auto-closed at 23:59",
+              closedReason: "Auto-closed at 2026-04-01 23:59 WIB",
             },
             { merge: true }
           );
           setIsVotingOpen(false);
-          addToast("Voting otomatis ditutup pada jam 23:59. Terima kasih!", "info");
+          addToast("Voting otomatis ditutup sesuai jadwal. Terima kasih!", "info");
         } catch (error) {
           console.error("Failed to auto-close voting gate:", error);
         }
