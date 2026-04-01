@@ -121,8 +121,6 @@ export default function SettingPage() {
         </p>
         <h1 className="font-display text-4xl text-[--maroon]">Ganti Password / Token</h1>
         <p className="max-w-2xl text-sm text-foreground/75">
-          Setiap perubahan password akan dicatat ke database audit developer
-          untuk kebutuhan keamanan. Isi password lama dan password baru kamu di bawah.
         </p>
       </header>
 

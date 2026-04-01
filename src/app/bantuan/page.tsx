@@ -289,7 +289,7 @@ export default function BantuanPage() {
         <p className="section-kicker">Support Desk</p>
         <h1 className="section-title">Bantuan & Chat Admin</h1>
         <p className="max-w-3xl text-sm text-foreground/75">
-          Form dibuat ringkas: pilih kategori, kirim pesan awal, lalu lanjut chat sampai selesai.
+          Pilih kategori, kirim pesan awal, lalu lanjut chat sampai selesai.
         </p>
       </header>
 

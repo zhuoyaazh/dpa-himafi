@@ -86,7 +86,7 @@ export default function LoginPage() {
     }
 
     if (!isCampusEmail(loginEmail)) {
-      const text = "Gunakan NIM atau email ITB yang valid.";
+      const text = "Gunakan NIM atau email yang valid.";
       setMessage(text);
       addToast(text, "warning");
       return;

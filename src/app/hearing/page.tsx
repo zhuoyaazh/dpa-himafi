@@ -487,7 +487,8 @@ export default function HearingPage() {
         <p className="section-kicker">Hearing Attendance</p>
         <h1 className="section-title">Presensi Hearing</h1>
         <p className="max-w-2xl text-sm text-foreground/75">
-          Presensi awal dan presensi akhir wajib menggunakan token panitia serta Upload Bukti Kehadiran.
+          Silakan masukkan token presensi dan unggah bukti kehadiran untuk melakukan presensi.
+
         </p>
       </header>
 
