@@ -18,7 +18,13 @@ type ImportantInfo = {
 };
 
 type VoteRow = {
+  nim?: string;
   candidateId?: string;
+  bobotSuara?: number;
+};
+
+type UserVoteWeightRow = {
+  nim?: string;
   bobotSuara?: number;
 };
 
@@ -62,6 +68,7 @@ export default function Home() {
   const countdown = useVotingCountdown();
   const [importantInfo, setImportantInfo] = useState<ImportantInfo | null>(null);
   const [votes, setVotes] = useState<VoteRow[]>([]);
+  const [weightByNim, setWeightByNim] = useState<Record<string, number>>({});
   const [isAdmin, setIsAdmin] = useState(false);
   const [showCandidateBreakdownPublic, setShowCandidateBreakdownPublic] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -102,10 +109,28 @@ export default function Home() {
 
     async function loadVoteSummary() {
       try {
-        const snapshot = await getDocs(collection(db, "suara_masuk"));
-        setVotes(snapshot.docs.map((d) => d.data() as VoteRow));
+        const [voteSnapshot, usersSnapshot] = await Promise.all([
+          getDocs(collection(db, "suara_masuk")),
+          getDocs(collection(db, "users")),
+        ]);
+
+        setVotes(voteSnapshot.docs.map((d) => d.data() as VoteRow));
+
+        const nextWeightByNim: Record<string, number> = {};
+        usersSnapshot.docs.forEach((userDoc) => {
+          const data = userDoc.data() as UserVoteWeightRow;
+          const nim = normalizeNim(data.nim ?? userDoc.id);
+          const parsedWeight = Number(data.bobotSuara);
+
+          if (nim && (parsedWeight === 1 || parsedWeight === 1.5 || parsedWeight === 2)) {
+            nextWeightByNim[nim] = parsedWeight;
+          }
+        });
+
+        setWeightByNim(nextWeightByNim);
       } catch {
         setVotes([]);
+        setWeightByNim({});
       }
     }
 
@@ -165,22 +190,24 @@ export default function Home() {
   const greetingName = nickName || getNimFromEmail(currentUser?.email) || "Sobat HIMAFI";
 
   const voteSummary = useMemo(() => {
-    const totalWeight = votes.reduce(
-      (acc, v) => acc + Number(v.bobotSuara ?? 0),
-      0,
-    );
+    const totalWeight = votes.reduce((acc, v) => {
+      const nim = normalizeNim(v.nim ?? "");
+      const effectiveWeight = Number(weightByNim[nim] ?? v.bobotSuara ?? 1);
+      return acc + effectiveWeight;
+    }, 0);
 
     return CANDIDATES.map((c) => {
       const candidateVotes = votes.filter((v) => v.candidateId === c.id);
-      const weightedVotes = candidateVotes.reduce(
-        (acc, v) => acc + Number(v.bobotSuara ?? 0),
-        0,
-      );
+      const weightedVotes = candidateVotes.reduce((acc, v) => {
+        const nim = normalizeNim(v.nim ?? "");
+        const effectiveWeight = Number(weightByNim[nim] ?? v.bobotSuara ?? 1);
+        return acc + effectiveWeight;
+      }, 0);
       const percentage = totalWeight > 0 ? (weightedVotes / totalWeight) * 100 : 0;
 
       return { ...c, voteCount: candidateVotes.length, weightedVotes, percentage };
     });
-  }, [votes]);
+  }, [votes, weightByNim]);
 
   if (!isAuthResolved) {
     return (

@@ -5,14 +5,18 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import { CANDIDATES } from "@/lib/candidates";
+import { normalizeNim } from "@/lib/voter-identity";
 
 type VoteRow = {
+  nim?: string;
   candidateId?: string;
   bobotSuara?: number;
 };
 
 type UserRow = {
+  nim?: string;
   sudahVote?: boolean;
+  bobotSuara?: number;
 };
 
 export default function HasilPage() {
@@ -20,6 +24,7 @@ export default function HasilPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [votes, setVotes] = useState<VoteRow[]>([]);
   const [notVotedCount, setNotVotedCount] = useState(0);
+  const [weightByNim, setWeightByNim] = useState<Record<string, number>>({});
   const [isAdmin, setIsAdmin] = useState(false);
   const [showCandidateBreakdownPublic, setShowCandidateBreakdownPublic] = useState(false);
 
@@ -33,11 +38,20 @@ export default function HasilPage() {
         setVotes(voteSnapshot.docs.map((row) => row.data() as VoteRow));
 
         const userSnapshot = await getDocs(collection(db, "users"));
+        const nextWeightByNim: Record<string, number> = {};
         const belumVoteCount = userSnapshot.docs.reduce((accumulator, row) => {
           const data = row.data() as UserRow;
+          const nim = normalizeNim(data.nim ?? row.id);
+
+          const parsedWeight = Number(data.bobotSuara);
+          if (nim && (parsedWeight === 1 || parsedWeight === 1.5 || parsedWeight === 2)) {
+            nextWeightByNim[nim] = parsedWeight;
+          }
+
           return accumulator + (data.sudahVote === true ? 0 : 1);
         }, 0);
         setNotVotedCount(belumVoteCount);
+        setWeightByNim(nextWeightByNim);
       } catch (error) {
         console.error("Error loading results:", error);
         setErrorMessage("Gagal memuat hasil voting. Coba refresh halaman.");
@@ -92,11 +106,20 @@ export default function HasilPage() {
       setVotes(voteSnapshot.docs.map((row) => row.data() as VoteRow));
 
       const userSnapshot = await getDocs(collection(db, "users"));
+      const nextWeightByNim: Record<string, number> = {};
       const belumVoteCount = userSnapshot.docs.reduce((accumulator, row) => {
         const data = row.data() as UserRow;
+        const nim = normalizeNim(data.nim ?? row.id);
+
+        const parsedWeight = Number(data.bobotSuara);
+        if (nim && (parsedWeight === 1 || parsedWeight === 1.5 || parsedWeight === 2)) {
+          nextWeightByNim[nim] = parsedWeight;
+        }
+
         return accumulator + (data.sudahVote === true ? 0 : 1);
       }, 0);
       setNotVotedCount(belumVoteCount);
+      setWeightByNim(nextWeightByNim);
     } catch (error) {
       console.error("Error refreshing results:", error);
       setErrorMessage("Gagal memuat hasil voting. Coba refresh halaman.");
@@ -106,8 +129,11 @@ export default function HasilPage() {
   }
 
   const summary = useMemo(() => {
-    const totalWeight = votes.reduce(
-      (accumulator, vote) => accumulator + Number(vote.bobotSuara ?? 0),
+    const totalWeight = votes.reduce((accumulator, vote) => {
+      const nim = normalizeNim(vote.nim ?? "");
+      const effectiveWeight = Number(weightByNim[nim] ?? vote.bobotSuara ?? 1);
+      return accumulator + effectiveWeight;
+    },
       0,
     );
 
@@ -115,7 +141,11 @@ export default function HasilPage() {
       const candidateVotes = votes.filter((vote) => vote.candidateId === candidate.id);
       const voteCount = candidateVotes.length;
       const weightedVotes = candidateVotes.reduce(
-        (accumulator, vote) => accumulator + Number(vote.bobotSuara ?? 0),
+        (accumulator, vote) => {
+          const nim = normalizeNim(vote.nim ?? "");
+          const effectiveWeight = Number(weightByNim[nim] ?? vote.bobotSuara ?? 1);
+          return accumulator + effectiveWeight;
+        },
         0,
       );
       const percentage = totalWeight > 0 ? (weightedVotes / totalWeight) * 100 : 0;
@@ -127,7 +157,7 @@ export default function HasilPage() {
         percentage,
       };
     });
-  }, [votes]);
+  }, [votes, weightByNim]);
 
   const totalVoters = votes.length;
   const invalidVotes = notVotedCount;

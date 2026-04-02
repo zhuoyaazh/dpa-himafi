@@ -11,7 +11,7 @@ type CountdownTime = {
 // Can be overridden in env: NEXT_PUBLIC_VOTING_CLOSE_AT=2026-04-01T23:59:59+07:00
 const DEFAULT_VOTING_CLOSE_AT = "2026-04-01T23:59:59+07:00";
 
-function resolveVotingDeadline() {
+export function getVotingDeadline() {
   const rawDeadline = process.env.NEXT_PUBLIC_VOTING_CLOSE_AT ?? DEFAULT_VOTING_CLOSE_AT;
   const parsed = new Date(rawDeadline);
 
@@ -20,6 +20,10 @@ function resolveVotingDeadline() {
   }
 
   return parsed;
+}
+
+export function isVotingDeadlinePassed(referenceDate = new Date()) {
+  return referenceDate >= getVotingDeadline();
 }
 
 export function useVotingCountdown() {
@@ -31,7 +35,7 @@ export function useVotingCountdown() {
   });
 
   useEffect(() => {
-    const deadline = resolveVotingDeadline();
+    const deadline = getVotingDeadline();
 
     function calculateCountdown() {
       const now = new Date();

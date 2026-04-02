@@ -13,11 +13,13 @@ import {
   onSnapshot,
   orderBy,
   query,
+  where,
   serverTimestamp,
   setDoc,
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseAuth, db } from "@/lib/firebase";
+import { isVotingDeadlinePassed } from "@/lib/voting-countdown";
 
 type VoteWeightValue = 1 | 1.5 | 2;
 
@@ -39,6 +41,28 @@ function parseVoteWeight(rawWeight: string): VoteWeightValue | null {
   }
 
   return null;
+}
+
+function inferAttendanceType(bobot: VoteWeightValue): string | undefined {
+  if (bobot === 1.5) return "online";
+  if (bobot === 2) return "offline";
+  return undefined; // bobot 1 atau lainnya: kosongkan
+}
+
+function mapFirestoreWriteError(error: unknown) {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+
+    if (message.includes("quota") || message.includes("resource-exhausted")) {
+      return "Kuota Firestore habis (quota exceeded). Coba lagi setelah reset kuota atau upgrade ke Blaze agar proses bobot tidak gagal.";
+    }
+
+    if (message.includes("permission") || message.includes("insufficient permissions")) {
+      return "Akses ditolak oleh Firestore Rules. Pastikan akun ini punya izin admin untuk update bobot.";
+    }
+  }
+
+  return "Terjadi kendala saat menyimpan bobot suara. Coba lagi.";
 }
 
 type AuditLog = {
@@ -110,6 +134,7 @@ export default function AdminPage() {
   const [manualWeightValue, setManualWeightValue] = useState<`${VoteWeightValue}`>("1");
   const [bulkWeightInput, setBulkWeightInput] = useState("");
   const [isSavingManualWeight, setIsSavingManualWeight] = useState(false);
+  const [isTestingManualNim, setIsTestingManualNim] = useState(false);
   const [isSavingBulkWeight, setIsSavingBulkWeight] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState("");
   const [togglingSessionId, setTogglingSessionId] = useState("");
@@ -307,12 +332,28 @@ export default function AdminPage() {
           ),
         );
 
-        const voteSnapshot = await getDocs(collection(db, "suara_masuk"));
-        const voteRows = voteSnapshot.docs.map((voteDoc) => voteDoc.data() as { bobotSuara?: number });
-        const voteWeight = voteRows.reduce(
-          (accumulator, vote) => accumulator + Number(vote.bobotSuara ?? 0),
-          0,
-        );
+        const [voteSnapshot, usersSnapshot] = await Promise.all([
+          getDocs(collection(db, "suara_masuk")),
+          getDocs(collection(db, "users")),
+        ]);
+        const voteRows = voteSnapshot.docs.map((voteDoc) => voteDoc.data() as { nim?: string; bobotSuara?: number });
+
+        const weightByNim = new Map<string, number>();
+        usersSnapshot.docs.forEach((userDoc) => {
+          const userData = userDoc.data() as { nim?: string; bobotSuara?: number };
+          const nim = normalizeNim(userData.nim ?? userDoc.id);
+          const parsedWeight = Number(userData.bobotSuara);
+
+          if (nim && (parsedWeight === 1 || parsedWeight === 1.5 || parsedWeight === 2)) {
+            weightByNim.set(nim, parsedWeight);
+          }
+        });
+
+        const voteWeight = voteRows.reduce((accumulator, vote) => {
+          const nim = normalizeNim(vote.nim ?? "");
+          const effectiveWeight = Number(weightByNim.get(nim) ?? vote.bobotSuara ?? 1);
+          return accumulator + effectiveWeight;
+        }, 0);
 
         setLogs(snapshot.docs.map((log) => log.data() as AuditLog));
         setTotalVotes(voteRows.length);
@@ -352,6 +393,7 @@ export default function AdminPage() {
         doc(db, "site_settings", "voting_gate"),
         {
           isOpen: nextValue,
+          manualOverrideAfterDeadline: nextValue ? isVotingDeadlinePassed() : false,
           updatedAt: serverTimestamp(),
           updatedByUid: user.uid,
           updatedByEmail: user.email,
@@ -689,6 +731,8 @@ export default function AdminPage() {
     try {
       setIsSavingManualWeight(true);
 
+      const attendanceType = inferAttendanceType(parsedWeight);
+
       await setDoc(
         doc(db, "users", normalizedNim),
         {
@@ -697,14 +741,15 @@ export default function AdminPage() {
           bobotUpdatedAt: serverTimestamp(),
           bobotUpdatedByUid: user.uid,
           bobotUpdatedByEmail: user.email,
+          ...(attendanceType && { attendanceType }),
         },
         { merge: true },
       );
 
       setMessage(`Bobot suara NIM ${normalizedNim} diset ke ${parsedWeight}.`);
       setManualWeightNim("");
-    } catch {
-      setMessage("Gagal menyimpan bobot suara manual.");
+    } catch (error) {
+      setMessage(mapFirestoreWriteError(error));
     } finally {
       setIsSavingManualWeight(false);
     }
@@ -753,36 +798,81 @@ export default function AdminPage() {
       return;
     }
 
-    if (invalidLines.length > 0) {
-      setMessage(`Ada ${invalidLines.length} baris tidak valid. Pastikan format nim,bobot dan NIM tepat 8 digit.`);
+    try {
+      setIsSavingBulkWeight(true);
+
+      // Firestore batch has an operation limit. Keep chunk modest for reliability.
+      const chunkSize = 400;
+      for (let start = 0; start < parsedRows.length; start += chunkSize) {
+        const chunk = parsedRows.slice(start, start + chunkSize);
+        const batch = writeBatch(db);
+
+        for (const row of chunk) {
+          const attendanceType = inferAttendanceType(row.bobotSuara);
+          batch.set(
+            doc(db, "users", row.nim),
+            {
+              nim: row.nim,
+              bobotSuara: row.bobotSuara,
+              bobotUpdatedAt: serverTimestamp(),
+              bobotUpdatedByUid: user.uid,
+              bobotUpdatedByEmail: user.email,
+              ...(attendanceType && { attendanceType }),
+            },
+            { merge: true },
+          );
+        }
+
+        await batch.commit();
+      }
+
+      if (invalidLines.length > 0) {
+        setMessage(`Import bobot selesai: ${parsedRows.length} NIM tersimpan ke users, ${invalidLines.length} baris dilewati karena format tidak valid.`);
+      } else {
+        setMessage(`Import bobot suara berhasil: ${parsedRows.length} NIM tersimpan ke users.`);
+      }
+      setBulkWeightInput("");
+    } catch (error) {
+      setMessage(mapFirestoreWriteError(error));
+    } finally {
+      setIsSavingBulkWeight(false);
+    }
+  }
+
+  async function onTestSingleNim() {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa tes data NIM.");
+      return;
+    }
+
+    const normalizedNim = normalizeNim(manualWeightNim);
+    if (!isValidWeightUpdateNim(normalizedNim)) {
+      setMessage("NIM tidak valid untuk test. Gunakan tepat 8 digit angka.");
       return;
     }
 
     try {
-      setIsSavingBulkWeight(true);
+      setIsTestingManualNim(true);
 
-      const batch = writeBatch(db);
-      for (const row of parsedRows) {
-        batch.set(
-          doc(db, "users", row.nim),
-          {
-            nim: row.nim,
-            bobotSuara: row.bobotSuara,
-            bobotUpdatedAt: serverTimestamp(),
-            bobotUpdatedByUid: user.uid,
-            bobotUpdatedByEmail: user.email,
-          },
-          { merge: true },
-        );
-      }
+      const [userSnapshot, voteSnapshot] = await Promise.all([
+        getDoc(doc(db, "users", normalizedNim)),
+        getDoc(doc(db, "suara_masuk", normalizedNim)),
+      ]);
 
-      await batch.commit();
-      setMessage(`Import bobot suara berhasil: ${parsedRows.length} NIM tersimpan.`);
-      setBulkWeightInput("");
-    } catch {
-      setMessage("Gagal import bobot suara bulk.");
+      const userData = userSnapshot.exists()
+        ? (userSnapshot.data() as { sudahVote?: boolean; bobotSuara?: number })
+        : undefined;
+      const voteData = voteSnapshot.exists()
+        ? (voteSnapshot.data() as { bobotSuara?: number; candidateId?: string })
+        : undefined;
+
+      setMessage(
+        `Test NIM ${normalizedNim} -> users: ${userSnapshot.exists() ? "ada" : "tidak ada"}, sudahVote: ${userData?.sudahVote === true ? "true" : "false/empty"}, bobot users (sumber utama): ${userData?.bobotSuara ?? "-"}, suara_masuk: ${voteSnapshot.exists() ? "ada" : "tidak ada"}, bobot vote: ${voteData?.bobotSuara ?? "-"}`,
+      );
+    } catch (error) {
+      setMessage(mapFirestoreWriteError(error));
     } finally {
-      setIsSavingBulkWeight(false);
+      setIsTestingManualNim(false);
     }
   }
 
@@ -934,14 +1024,24 @@ export default function AdminPage() {
                   </select>
                 </label>
 
-                <button
-                  type="button"
-                  onClick={() => void onSaveManualVoteWeight()}
-                  disabled={isSavingManualWeight}
-                  className="button-gold inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
-                >
-                  {isSavingManualWeight ? "Menyimpan..." : "Simpan Bobot NIM"}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void onSaveManualVoteWeight()}
+                    disabled={isSavingManualWeight}
+                    className="button-gold inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
+                  >
+                    {isSavingManualWeight ? "Menyimpan..." : "Simpan Bobot NIM"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onTestSingleNim()}
+                    disabled={isTestingManualNim}
+                    className="button-outline inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
+                  >
+                    {isTestingManualNim ? "Testing..." : "Test 1 NIM"}
+                  </button>
+                </div>
               </section>
 
               <section className="grid gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">

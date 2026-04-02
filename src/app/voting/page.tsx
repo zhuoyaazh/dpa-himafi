@@ -67,8 +67,19 @@ export default function VotingPage() {
     if (countdown.isExpired && isVotingOpen) {
       async function autoCloseVotingGate() {
         try {
+          const gateRef = doc(db, "site_settings", "voting_gate");
+          const currentGateSnapshot = await getDoc(gateRef);
+          const currentGateData = currentGateSnapshot.exists()
+            ? (currentGateSnapshot.data() as { manualOverrideAfterDeadline?: boolean; isOpen?: boolean })
+            : undefined;
+
+          // If admin intentionally reopened gate after deadline, do not auto-close again.
+          if (currentGateData?.manualOverrideAfterDeadline && currentGateData.isOpen !== false) {
+            return;
+          }
+
           await setDoc(
-            doc(db, "site_settings", "voting_gate"),
+            gateRef,
             {
               isOpen: false,
               autoClosedAt: serverTimestamp(),

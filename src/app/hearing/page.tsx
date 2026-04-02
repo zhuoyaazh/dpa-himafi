@@ -393,6 +393,7 @@ export default function HearingPage() {
             statusHearing: isStatusHearing,
             status_hearing: isStatusHearing,
             classification,
+            hearingClassification: classification,
             hearingSummary: {
               hasPresensiAwal,
               hasPresensiAkhir,

@@ -52,7 +52,6 @@ async function performVoteTransaction(context: SubmitVoteContext) {
       userRef,
       {
         nim: context.sanitizedNim,
-        statusHearing: voteWeight > 1,
         sudahVote: true,
         bobotSuara: voteWeight,
         voterUid: context.voterUid,
@@ -68,7 +67,7 @@ async function performVoteTransaction(context: SubmitVoteContext) {
       voterUid: context.voterUid,
       voterEmail: context.voterEmail,
       candidateId: context.candidateId,
-      statusHearing: voteWeight > 1,
+      statusHearing: false, // Will be updated later from hearing_attendance data
       bobotSuara: voteWeight,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
