@@ -256,7 +256,7 @@ export default function HasilPage() {
 
       {topCandidate && canViewCandidateBreakdown ? (
         <section className="gold-card overflow-hidden p-6">
-          <p className="subtitle-strong">Peringkat Sementara</p>
+          <p className="subtitle-strong">Hasil Akhir</p>
           <h2 className="font-display mt-2 wrap-break-word text-3xl text-[--maroon]">
             {topCandidate.name} memimpin dengan bobot {topCandidate.weightedVotes}
           </h2>
