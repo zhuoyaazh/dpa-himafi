@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CANDIDATES } from "@/lib/candidates";
 import { getFirebaseAuth } from "@/lib/firebase";
@@ -136,6 +136,38 @@ export default function Home() {
 
     void loadVoteSummary();
 
+    // Real-time listener for votes
+    const unsubscribeVotes = onSnapshot(
+      collection(db, "suara_masuk"),
+      (snapshot) => {
+        setVotes(snapshot.docs.map((d) => d.data() as VoteRow));
+      },
+      (error) => {
+        console.error("Error listening to votes:", error);
+      },
+    );
+
+    // Real-time listener for user bobot
+    const unsubscribeUsers = onSnapshot(
+      collection(db, "users"),
+      (snapshot) => {
+        const nextWeightByNim: Record<string, number> = {};
+        snapshot.docs.forEach((userDoc) => {
+          const data = userDoc.data() as UserVoteWeightRow;
+          const nim = normalizeNim(data.nim ?? userDoc.id);
+          const parsedWeight = Number(data.bobotSuara);
+
+          if (nim && (parsedWeight === 1 || parsedWeight === 1.5 || parsedWeight === 2)) {
+            nextWeightByNim[nim] = parsedWeight;
+          }
+        });
+        setWeightByNim(nextWeightByNim);
+      },
+      (error) => {
+        console.error("Error listening to users:", error);
+      },
+    );
+
     async function loadResultsVisibility() {
       try {
         const snapshot = await getDoc(doc(db, "site_settings", "results_visibility"));
@@ -154,7 +186,7 @@ export default function Home() {
     void loadResultsVisibility();
 
     const auth = getFirebaseAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setCurrentUser(currentUser);
       setIsAuthResolved(true);
 
@@ -183,7 +215,11 @@ export default function Home() {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeVotes();
+      unsubscribeUsers();
+      unsubscribeAuth();
+    };
   }, [router]);
 
   const canViewCandidateBreakdown = isAdmin || showCandidateBreakdownPublic;

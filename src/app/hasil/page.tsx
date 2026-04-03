@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { db, getFirebaseAuth } from "@/lib/firebase";
 import { CANDIDATES } from "@/lib/candidates";
@@ -62,6 +62,46 @@ export default function HasilPage() {
 
     void loadResults();
 
+    // Real-time listener for users bobot updates
+    const unsubscribeUsers = onSnapshot(
+      collection(db, "users"),
+      (snapshot) => {
+        const nextWeightByNim: Record<string, number> = {};
+        let belumVoteCount = 0;
+
+        snapshot.docs.forEach((userDoc) => {
+          const data = userDoc.data() as UserRow;
+          const nim = normalizeNim(data.nim ?? userDoc.id);
+
+          const parsedWeight = Number(data.bobotSuara);
+          if (nim && (parsedWeight === 1 || parsedWeight === 1.5 || parsedWeight === 2)) {
+            nextWeightByNim[nim] = parsedWeight;
+          }
+
+          if (data.sudahVote !== true) {
+            belumVoteCount += 1;
+          }
+        });
+
+        setWeightByNim(nextWeightByNim);
+        setNotVotedCount(belumVoteCount);
+      },
+      (error) => {
+        console.error("Error listening to users collection:", error);
+      },
+    );
+
+    // Real-time listener for vote updates
+    const unsubscribeVotes = onSnapshot(
+      collection(db, "suara_masuk"),
+      (snapshot) => {
+        setVotes(snapshot.docs.map((row) => row.data() as VoteRow));
+      },
+      (error) => {
+        console.error("Error listening to suara_masuk collection:", error);
+      },
+    );
+
     async function loadResultsVisibility() {
       try {
         const snapshot = await getDoc(doc(db, "site_settings", "results_visibility"));
@@ -80,7 +120,7 @@ export default function HasilPage() {
     void loadResultsVisibility();
 
     const auth = getFirebaseAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         setIsAdmin(false);
         return;
@@ -94,7 +134,11 @@ export default function HasilPage() {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeUsers();
+      unsubscribeVotes();
+      unsubscribeAuth();
+    };
   }, []);
 
   async function refreshResults() {

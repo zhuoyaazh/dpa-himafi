@@ -258,8 +258,15 @@ function buildRecapRows(users, votes) {
     const user = usersByNim.get(key);
     const vote = votesByKey.get(key);
     const nim = normalizeNim(user?.nim ?? vote?.nim ?? (String(key).startsWith("legacy:") ? "" : key));
-    const bobotSuara = normalizeVoteWeight(vote?.bobotSuara ?? user?.bobotSuara);
-    const statusHearing = Boolean(vote?.statusHearing ?? user?.statusHearing ?? bobotSuara > 1);
+    // users is the source of truth for latest manual/admin bobot updates
+    const bobotSuara = normalizeVoteWeight(user?.bobotSuara ?? vote?.bobotSuara);
+    const statusHearing = Boolean(
+      user?.statusHearing
+      ?? user?.status_hearing
+      ?? vote?.statusHearing
+      ?? vote?.status_hearing
+      ?? false,
+    );
 
     const row = {
       nim,
