@@ -139,6 +139,23 @@ export default function AdminPage() {
   const [editingSessionId, setEditingSessionId] = useState("");
   const [togglingSessionId, setTogglingSessionId] = useState("");
 
+  // LPJ Settings state
+  const [lpjSessions, setLpjSessions] = useState<HearingSessionSummary[]>([]);
+  const [lpjSettings, setLpjSettings] = useState<HearingSettingsForm>({
+    sessionName: "",
+    isActive: false,
+    presensiAwalAktif: true,
+    presensiAkhirAktif: true,
+    presensiAwalToken: "",
+    presensiAkhirToken: "",
+  });
+  const [activeLpjSessionId, setActiveLpjSessionId] = useState("");
+  const [selectedLpjSessionId, setSelectedLpjSessionId] = useState("");
+  const [editingLpjSessionId, setEditingLpjSessionId] = useState("");
+  const [togglingLpjSessionId, setTogglingLpjSessionId] = useState("");
+  const [deletingLpjSessionId, setDeletingLpjSessionId] = useState("");
+  const [isSavingLpjSettings, setIsSavingLpjSettings] = useState(false);
+
   const mapSessionToForm = useCallback((data: {
     name?: string;
     isActive?: boolean;
@@ -277,6 +294,25 @@ export default function AdminPage() {
     setIsVotingOpen(data.isOpen !== false);
   }, []);
 
+  const loadLpjSettingsAndHistory = useCallback(async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "lpj_sessions"));
+      const sessions: HearingSessionSummary[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name ?? "LPJ Session",
+        updatedAt: doc.data().updatedAt,
+        isActive: doc.data().isActive ?? false,
+      }));
+      setLpjSessions(sessions);
+
+      const settingsDoc = await getDoc(doc(db, "lpj_settings", "current"));
+      const activeId = settingsDoc.data()?.activeSessionId ?? "";
+      setActiveLpjSessionId(activeId);
+    } catch {
+      setMessage("Gagal memuat data sesi LPJ.");
+    }
+  }, []);
+
   useEffect(() => {
     const auth = getFirebaseAuth();
     let unsubscribeUsers: (() => void) | null = null;
@@ -363,6 +399,7 @@ export default function AdminPage() {
           loadAnnouncementHistory(),
           loadResultsVisibility(),
           loadVotingGateSettings(),
+          loadLpjSettingsAndHistory(),
         ]);
         setMessage("Audit log berhasil dimuat.");
       } catch {
@@ -378,7 +415,7 @@ export default function AdminPage() {
         unsubscribeUsers();
       }
     };
-  }, [loadAnnouncementHistory, loadHearingSettingsAndHistory, loadResultsVisibility, loadVotingGateSettings]);
+  }, [loadAnnouncementHistory, loadHearingSettingsAndHistory, loadResultsVisibility, loadVotingGateSettings, loadLpjSettingsAndHistory]);
 
   async function onToggleVotingGate(nextValue: boolean) {
     if (!user || !isAdmin) {
@@ -710,6 +747,202 @@ export default function AdminPage() {
     }
   }
 
+  async function onSaveLpjSettings() {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa menyimpan pengaturan LPJ.");
+      return;
+    }
+
+    let targetSessionId = selectedLpjSessionId;
+
+    if (!lpjSettings.presensiAwalAktif && !lpjSettings.presensiAkhirAktif) {
+      setLpjSettings((prev) => ({
+        ...prev,
+        presensiAwalAktif: true,
+      }));
+      return;
+    }
+
+    try {
+      setIsSavingLpjSettings(true);
+
+      if (!targetSessionId) {
+        const createdRef = doc(collection(db, "lpj_sessions"));
+        targetSessionId = createdRef.id;
+      }
+
+      const normalizedSessionName = lpjSettings.sessionName.trim() || `Sesi LPJ ${new Date().toLocaleString()}`;
+
+      await setDoc(
+        doc(db, "lpj_sessions", targetSessionId),
+        {
+          name: normalizedSessionName,
+          isActive: lpjSettings.isActive,
+          presensiAwalAktif: lpjSettings.presensiAwalAktif,
+          presensiAkhirAktif: lpjSettings.presensiAkhirAktif,
+          updatedAt: serverTimestamp(),
+          updatedByUid: user.uid,
+          updatedByEmail: user.email,
+        },
+        { merge: true },
+      );
+
+      await setDoc(
+        doc(db, "lpj_settings", "current"),
+        {
+          activeSessionId: lpjSettings.isActive ? targetSessionId : "",
+          updatedAt: serverTimestamp(),
+          updatedByUid: user.uid,
+          updatedByEmail: user.email,
+        },
+        { merge: true },
+      );
+
+      setSelectedLpjSessionId(targetSessionId);
+      setActiveLpjSessionId(lpjSettings.isActive ? targetSessionId : "");
+      await loadLpjSettingsAndHistory();
+      setEditingLpjSessionId("");
+      setMessage(
+        lpjSettings.isActive
+          ? "Sesi LPJ berhasil disimpan dan diaktifkan."
+          : "Sesi LPJ berhasil disimpan dalam kondisi nonaktif.",
+      );
+    } catch {
+      setMessage("Gagal menyimpan sesi LPJ.");
+    } finally {
+      setIsSavingLpjSettings(false);
+    }
+  }
+
+  async function onSetLpjSessionActiveState(session: HearingSessionSummary, shouldBeActive: boolean) {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa mengubah status sesi LPJ.");
+      return;
+    }
+
+    try {
+      setTogglingLpjSessionId(session.id);
+
+      if (shouldBeActive) {
+        const batch = writeBatch(db);
+
+        lpjSessions.forEach((candidateSession) => {
+          batch.set(
+            doc(db, "lpj_sessions", candidateSession.id),
+            {
+              isActive: candidateSession.id === session.id,
+              updatedAt: serverTimestamp(),
+              updatedByUid: user.uid,
+              updatedByEmail: user.email,
+            },
+            { merge: true },
+          );
+        });
+
+        batch.set(
+          doc(db, "lpj_settings", "current"),
+          {
+            activeSessionId: session.id,
+            updatedAt: serverTimestamp(),
+            updatedByUid: user.uid,
+            updatedByEmail: user.email,
+          },
+          { merge: true },
+        );
+
+        await batch.commit();
+        setMessage(`Sesi \"${session.name}\" berhasil diaktifkan.`);
+      } else {
+        const batch = writeBatch(db);
+
+        batch.set(
+          doc(db, "lpj_sessions", session.id),
+          {
+            isActive: false,
+            updatedAt: serverTimestamp(),
+            updatedByUid: user.uid,
+            updatedByEmail: user.email,
+          },
+          { merge: true },
+        );
+
+        if (activeLpjSessionId === session.id) {
+          batch.set(
+            doc(db, "lpj_settings", "current"),
+            {
+              activeSessionId: "",
+              updatedAt: serverTimestamp(),
+              updatedByUid: user.uid,
+              updatedByEmail: user.email,
+            },
+            { merge: true },
+          );
+        }
+
+        await batch.commit();
+        setMessage(`Sesi \"${session.name}\" berhasil dinonaktifkan.`);
+      }
+
+      await loadLpjSettingsAndHistory();
+    } catch {
+      setMessage("Gagal mengubah status sesi LPJ.");
+    } finally {
+      setTogglingLpjSessionId("");
+    }
+  }
+
+  async function onDeleteLpjSession(sessionId: string, sessionName: string) {
+    if (!user || !isAdmin) {
+      setMessage("Hanya admin aktif yang bisa menghapus sesi LPJ.");
+      return;
+    }
+
+    const agreed = window.confirm(`Hapus sesi LPJ "${sessionName}"?`);
+    if (!agreed) {
+      return;
+    }
+
+    try {
+      setDeletingLpjSessionId(sessionId);
+
+      await deleteDoc(doc(db, "lpj_sessions", sessionId));
+
+      if (activeLpjSessionId === sessionId) {
+        await setDoc(
+          doc(db, "lpj_settings", "current"),
+          {
+            activeSessionId: "",
+            updatedAt: serverTimestamp(),
+            updatedByUid: user.uid,
+            updatedByEmail: user.email,
+          },
+          { merge: true },
+        );
+      }
+
+      await loadLpjSettingsAndHistory();
+      setMessage(`Sesi LPJ "${sessionName}" berhasil dihapus.`);
+    } catch {
+      setMessage("Gagal menghapus sesi LPJ.");
+    } finally {
+      setDeletingLpjSessionId("");
+    }
+  }
+
+  async function onLoadLpjSession(sessionId: string) {
+    try {
+      const sessionDoc = await getDoc(doc(db, "lpj_sessions", sessionId));
+      if (sessionDoc.exists()) {
+        const data = sessionDoc.data();
+        setLpjSettings(mapSessionToForm(data));
+        setSelectedLpjSessionId(sessionId);
+        setEditingLpjSessionId(sessionId);
+      }
+    } catch {
+      setMessage("Gagal memuat data sesi LPJ.");
+    }
+  }
+
   async function onSaveManualVoteWeight() {
     if (!user || !isAdmin) {
       setMessage("Hanya admin aktif yang bisa mengubah bobot suara.");
@@ -895,106 +1128,29 @@ export default function AdminPage() {
               <p className="subtitle-strong">Total Audit Event</p>
               <p className="font-display mt-2 text-3xl text-[--maroon]">{logs.length}</p>
             </div>
-            <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
-              <p className="subtitle-strong">Total Vote Terekam</p>
-              <p className="font-display mt-2 text-3xl text-[--maroon]">{totalVotes}</p>
-            </div>
-            <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
-              <p className="subtitle-strong">Total Bobot</p>
-              <p className="font-display mt-2 text-3xl text-[--maroon]">{totalVoteWeight}</p>
-            </div>
-            <div className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
-              <p className="subtitle-strong">Belum Vote</p>
-              <p className="font-display mt-2 text-3xl text-[--maroon]">{totalNotVoted}</p>
-            </div>
           </div>
         ) : null}
 
-        {isAdmin ? (
+        {false && isAdmin ? (
           <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
             <div className="space-y-2">
               <p className="subtitle-strong">Visibilitas Hasil Voting</p>
-              <p className="text-sm text-foreground/75">
-                Atur apakah rincian suara per calon (live count) ditampilkan ke publik atau hanya admin.
-              </p>
-            </div>
-
-            <div className="mt-4 grid gap-3 rounded-2xl border border-[--gold-soft] bg-[rgb(255_250_240/0.9)] p-4">
-              <p className="text-sm">
-                Status saat ini:{" "}
-                <span className="font-semibold text-[--maroon]">
-                  {showCandidateBreakdownPublic ? "Publik Bisa Lihat" : "Hanya Admin"}
-                </span>
-              </p>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void onToggleResultsVisibility(false)}
-                  disabled={isSavingResultsVisibility || !showCandidateBreakdownPublic}
-                  className="button-outline inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
-                >
-                  Hide untuk Publik
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void onToggleResultsVisibility(true)}
-                  disabled={isSavingResultsVisibility || showCandidateBreakdownPublic}
-                  className="button-gold inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
-                >
-                  Show ke Publik
-                </button>
-              </div>
             </div>
           </section>
         ) : null}
 
-        {isAdmin ? (
+        {false && isAdmin ? (
           <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
             <div className="space-y-2">
               <p className="subtitle-strong">Gate Voting (Open / Close)</p>
-              <p className="text-sm text-foreground/75">
-                Kontrol ini menentukan apakah mahasiswa bisa melakukan submit voting saat ini.
-              </p>
-            </div>
-
-            <div className="mt-4 grid gap-3 rounded-2xl border border-[--gold-soft] bg-[rgb(255_250_240/0.9)] p-4">
-              <p className="text-sm">
-                Status saat ini:{" "}
-                <span className="font-semibold text-[--maroon]">
-                  {isVotingOpen ? "Voting Dibuka" : "Voting Ditutup"}
-                </span>
-              </p>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void onToggleVotingGate(true)}
-                  disabled={isSavingVotingGate || isVotingOpen}
-                  className="button-gold inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
-                >
-                  Open Gate
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void onToggleVotingGate(false)}
-                  disabled={isSavingVotingGate || !isVotingOpen}
-                  className="button-outline inline-flex w-full justify-center disabled:opacity-60 sm:w-fit"
-                >
-                  Close Gate
-                </button>
-              </div>
             </div>
           </section>
         ) : null}
 
-        {isAdmin ? (
+        {false && isAdmin ? (
           <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
             <div className="space-y-2">
               <p className="subtitle-strong">Kelola Bobot Suara Manual</p>
-              <p className="text-sm text-foreground/75">
-                Gunakan bobot 1 (tidak hadir), 1.5 (hadir online), atau 2 (hadir offline). Jika bobot belum diisi, sistem pakai default 1.
-              </p>
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -1163,7 +1319,7 @@ export default function AdminPage() {
           </section>
         ) : null}
 
-        {isAdmin ? (
+        {false && isAdmin ? (
           <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
             <div className="space-y-2">
               <p className="subtitle-strong">Pengaturan Presensi Hearing</p>
@@ -1330,6 +1486,215 @@ export default function AdminPage() {
                               title="Hapus sesi"
                             >
                               {deletingSessionId === session.id ? "…" : "🗑"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {isAdmin ? (
+          <section className="rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+            <div className="space-y-2">
+              <p className="subtitle-strong">Pengaturan Presensi LPJ Akhir Tahun</p>
+              <p className="text-sm text-foreground/75">
+                Status sesi aktif saat ini: <span className="font-semibold text-[--maroon]">{activeLpjSessionId ? "Aktif" : "Tidak ada sesi aktif"}</span>
+              </p>
+            </div>
+
+            <div className="mt-4 grid gap-4">
+              <section className="grid gap-3 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+                <p className="font-semibold text-[--maroon]">Buat Sesi LPJ Baru</p>
+                {editingLpjSessionId ? (
+                  <p className="text-xs text-[--maroon] font-medium bg-[rgb(220_180_160/0.3)] rounded px-2 py-1">
+                    Mode Edit: Anda sedang mengubah session yang ada. Klik &quot;Simpan Perubahan&quot; untuk menyimpan.
+                  </p>
+                ) : null}
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">Nama Sesi</span>
+                  <input
+                    value={lpjSettings.sessionName}
+                    onChange={(event) =>
+                      setLpjSettings((previous) => ({
+                        ...previous,
+                        sessionName: event.target.value,
+                      }))
+                    }
+                    className="input-luxury"
+                    placeholder="Contoh: LPJ Akhir Tahun 2024"
+                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">Aktifkan Presensi Awal</span>
+                  <input
+                    type="checkbox"
+                    checked={lpjSettings.presensiAwalAktif}
+                    onChange={(event) =>
+                      setLpjSettings((previous) => ({
+                        ...previous,
+                        presensiAwalAktif: event.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4"
+                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">Aktifkan Presensi Akhir</span>
+                  <input
+                    type="checkbox"
+                    checked={lpjSettings.presensiAkhirAktif}
+                    onChange={(event) =>
+                      setLpjSettings((previous) => ({
+                        ...previous,
+                        presensiAkhirAktif: event.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4"
+                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">Token Presensi Awal</span>
+                  <input
+                    value={lpjSettings.presensiAwalToken}
+                    onChange={(event) =>
+                      setLpjSettings((previous) => ({
+                        ...previous,
+                        presensiAwalToken: event.target.value,
+                      }))
+                    }
+                    className="input-luxury"
+                    placeholder="Contoh: AWAL-LPJ (atau kosongkan jika tidak gunakan)"
+                  />
+                </label>
+
+                <label className="grid gap-1">
+                  <span className="font-semibold">Token Presensi Akhir</span>
+                  <input
+                    value={lpjSettings.presensiAkhirToken}
+                    onChange={(event) =>
+                      setLpjSettings((previous) => ({
+                        ...previous,
+                        presensiAkhirToken: event.target.value,
+                      }))
+                    }
+                    className="input-luxury"
+                    placeholder="Contoh: AKHIR-LPJ (atau kosongkan jika tidak gunakan)"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => void onSaveLpjSettings()}
+                  disabled={isSavingLpjSettings}
+                  className="button-gold inline-flex w-full items-center justify-center disabled:opacity-60 sm:w-fit"
+                >
+                  {isSavingLpjSettings ? (editingLpjSessionId ? "Menyimpan..." : "Membuat...") : (editingLpjSessionId ? "Simpan Perubahan" : "Buat Sesi Baru")}
+                </button>
+
+                {editingLpjSessionId ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingLpjSessionId("");
+                      setLpjSettings({
+                        sessionName: "",
+                        isActive: false,
+                        presensiAwalAktif: true,
+                        presensiAkhirAktif: true,
+                        presensiAwalToken: "",
+                        presensiAkhirToken: "",
+                      });
+                      setSelectedLpjSessionId("");
+                    }}
+                    className="button-outline inline-flex w-full items-center justify-center sm:w-fit"
+                  >
+                    Batal Edit
+                  </button>
+                ) : null}
+              </section>
+
+              {lpjSessions.length > 0 ? (
+                <section className="grid gap-2 rounded-2xl border border-[--gold-soft] bg-white/70 p-4">
+                  <p className="font-semibold text-[--maroon]">Riwayat Sesi LPJ</p>
+                  <div className="grid gap-2">
+                    {lpjSessions.map((session) => {
+                      const isSelected = selectedLpjSessionId === session.id;
+                      const isActive = activeLpjSessionId === session.id;
+
+                      return (
+                        <div
+                          key={session.id}
+                          className={`rounded-2xl border px-4 py-3 ${isSelected ? "border-[--maroon] bg-[rgb(56_6_9/0.08)]" : "border-[--gold-soft] bg-white/80"}`}
+                        >
+                          <div className="mb-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void onLoadLpjSession(session.id);
+                              }}
+                              className="min-w-0 flex-1 text-left"
+                            >
+                              <p className="font-semibold text-[--maroon]">{session.name}</p>
+                              <p className="mt-1 text-xs text-foreground/70">
+                                {session.updatedAt ? session.updatedAt.toDate().toLocaleString() : "Belum ada waktu update"}
+                              </p>
+                              {isActive ? (
+                                <p className="mt-1 text-xs font-semibold text-[--maroon]">Sedang Aktif</p>
+                              ) : null}
+                            </button>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:justify-end">
+                            <button
+                              type="button"
+                              onClick={() => void onSetLpjSessionActiveState(session, true)}
+                              disabled={togglingLpjSessionId === session.id}
+                              className="inline-flex flex-1 items-center justify-center rounded-full border border-[--gold-soft] bg-white px-2 py-2 text-xs font-semibold text-[--maroon] transition hover:bg-[rgb(56_6_9/0.08)] disabled:opacity-60 sm:flex-none sm:px-3"
+                              title="Aktifkan sesi ini"
+                            >
+                              {togglingLpjSessionId === session.id ? "..." : "Aktifkan"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => void onSetLpjSessionActiveState(session, false)}
+                              disabled={togglingLpjSessionId === session.id}
+                              className="inline-flex flex-1 items-center justify-center rounded-full border border-[--gold-soft] bg-white px-2 py-2 text-xs font-semibold text-[--maroon] transition hover:bg-[rgb(56_6_9/0.08)] disabled:opacity-60 sm:flex-none sm:px-3"
+                              title="Nonaktifkan sesi"
+                            >
+                              {togglingLpjSessionId === session.id ? "..." : "Nonaktifkan"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void onLoadLpjSession(session.id);
+                              }}
+                              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[--gold-soft] bg-white text-lg text-[--maroon] transition hover:bg-[rgb(56_6_9/0.08)]"
+                              aria-label={`Edit sesi ${session.name}`}
+                              title="Edit sesi (form di atas)"
+                            >
+                              ✎
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => void onDeleteLpjSession(session.id, session.name)}
+                              disabled={deletingLpjSessionId === session.id}
+                              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[--gold-soft] bg-white text-lg text-[--maroon] transition hover:bg-[rgb(56_6_9/0.08)] disabled:opacity-60"
+                              aria-label={`Hapus sesi ${session.name}`}
+                              title="Hapus sesi"
+                            >
+                              {deletingLpjSessionId === session.id ? "…" : "🗑"}
                             </button>
                           </div>
                         </div>

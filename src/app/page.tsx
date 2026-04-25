@@ -10,6 +10,7 @@ import { getFirebaseAuth } from "@/lib/firebase";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { normalizeNim } from "@/lib/voter-identity";
 import { useVotingCountdown } from "@/lib/voting-countdown";
+import { FEATURES } from "@/lib/config";
 
 type ImportantInfo = {
   title: string;
@@ -275,18 +276,22 @@ export default function Home() {
           >
             Login
           </Link>
-          <Link
-            href="/hearing"
-            className="button-outline"
-          >
-            Presensi Hearing
-          </Link>
-          <Link
-            href="/voting"
-            className="button-outline"
-          >
-            Voting
-          </Link>
+          {FEATURES.BP_SELECTION_ACTIVE && (
+            <>
+              <Link
+                href="/hearing"
+                className="button-outline"
+              >
+                Presensi Hearing
+              </Link>
+              <Link
+                href="/voting"
+                className="button-outline"
+              >
+                Voting
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -335,70 +340,74 @@ export default function Home() {
         </p>
       </article>
 
-      <article className="gold-card overflow-hidden p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="subtitle-strong">Overview Hasil Voting</p>
-            <p className="mt-1 text-xs text-foreground/60">
-              Total pemilih: {votes.length} · Total bobot:{" "}
-              {votes.reduce((acc, v) => acc + Number(v.bobotSuara ?? 0), 0)}
+      {FEATURES.BP_SELECTION_ACTIVE && (
+        <article className="gold-card overflow-hidden p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="subtitle-strong">Overview Hasil Voting</p>
+              <p className="mt-1 text-xs text-foreground/60">
+                Total pemilih: {votes.length} · Total bobot:{" "}
+                {votes.reduce((acc, v) => acc + Number(v.bobotSuara ?? 0), 0)}
+              </p>
+            </div>
+            <Link href="/hasil" className="button-outline shrink-0 text-xs">
+              Lihat Detail →
+            </Link>
+          </div>
+
+          {canViewCandidateBreakdown ? (
+            <div className="mt-5 space-y-2 sm:space-y-3">
+              {voteSummary.map((candidate, index) => {
+                const fill = candidate.percentage <= 0 ? 0 : Math.min(Math.max(candidate.percentage, 4), 100);
+
+                return (
+                  <div key={candidate.id}>
+                    <div className="mb-1 flex items-center justify-between text-xs sm:text-sm">
+                      <span className="font-semibold text-[--maroon] min-w-0">
+                        {candidate.ballotNumber}. {candidate.name}
+                      </span>
+                      <span className="text-foreground/70 shrink-0 ml-2">
+                        {candidate.percentage.toFixed(1)}% · {candidate.weightedVotes}
+                      </span>
+                    </div>
+                    <div className="h-2 sm:h-3 overflow-hidden rounded-full bg-[rgb(196_154_108/0.18)]">
+                      <div
+                        className="h-full rounded-full transition-[width] duration-500 ease-out"
+                        style={{
+                          width: `${fill}%`,
+                          background:
+                            index === 0
+                              ? "linear-gradient(90deg, var(--maroon), var(--gold))"
+                              : "linear-gradient(90deg, var(--ink), var(--gold))",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-foreground/70">
+              Live count per calon disembunyikan sementara untuk menjaga netralitas pemilihan.
             </p>
-          </div>
-          <Link href="/hasil" className="button-outline shrink-0 text-xs">
-            Lihat Detail →
-          </Link>
-        </div>
+          )}
+        </article>
+      )}
 
-        {canViewCandidateBreakdown ? (
-          <div className="mt-5 space-y-2 sm:space-y-3">
-            {voteSummary.map((candidate, index) => {
-              const fill = candidate.percentage <= 0 ? 0 : Math.min(Math.max(candidate.percentage, 4), 100);
-
-              return (
-                <div key={candidate.id}>
-                  <div className="mb-1 flex items-center justify-between text-xs sm:text-sm">
-                    <span className="font-semibold text-[--maroon] min-w-0">
-                      {candidate.ballotNumber}. {candidate.name}
-                    </span>
-                    <span className="text-foreground/70 shrink-0 ml-2">
-                      {candidate.percentage.toFixed(1)}% · {candidate.weightedVotes}
-                    </span>
-                  </div>
-                  <div className="h-2 sm:h-3 overflow-hidden rounded-full bg-[rgb(196_154_108/0.18)]">
-                    <div
-                      className="h-full rounded-full transition-[width] duration-500 ease-out"
-                      style={{
-                        width: `${fill}%`,
-                        background:
-                          index === 0
-                            ? "linear-gradient(90deg, var(--maroon), var(--gold))"
-                            : "linear-gradient(90deg, var(--ink), var(--gold))",
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-foreground/70">
-            Live count per calon disembunyikan sementara untuk menjaga netralitas pemilihan.
+      {FEATURES.BP_SELECTION_ACTIVE && (
+        <article className="gold-card overflow-hidden p-6">
+          <p className="subtitle-strong">Panduan Voting Singkat</p>
+          <h2 className="mt-2 font-display text-3xl text-[--maroon]">Cara Voting</h2>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-foreground/80">
+            <li>Login dengan akun kampus ITB (NIM/email) di halaman Login.</li>
+            <li>Buka Profil Calon untuk membaca visi-misi, draft, dan PPT kandidat.</li>
+            <li>Masuk ke halaman Voting, pilih kandidat, lalu submit.</li>
+          </ol>
+          <p className="mt-3 text-xs text-foreground/65">
+            Catatan: satu akun hanya bisa submit satu kali. Setelah submit, cek status di halaman Cek Status.
           </p>
-        )}
-      </article>
-
-      <article className="gold-card overflow-hidden p-6">
-        <p className="subtitle-strong">Panduan Voting Singkat</p>
-        <h2 className="mt-2 font-display text-3xl text-[--maroon]">Cara Voting</h2>
-        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-foreground/80">
-          <li>Login dengan akun kampus ITB (NIM/email) di halaman Login.</li>
-          <li>Buka Profil Calon untuk membaca visi-misi, draft, dan PPT kandidat.</li>
-          <li>Masuk ke halaman Voting, pilih kandidat, lalu submit.</li>
-        </ol>
-        <p className="mt-3 text-xs text-foreground/65">
-          Catatan: satu akun hanya bisa submit satu kali. Setelah submit, cek status di halaman Cek Status.
-        </p>
-      </article>
+        </article>
+      )}
     </section>
   );
 }

@@ -5,24 +5,39 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { getFirebaseAuth, db } from "@/lib/firebase";
+import { FEATURES } from "@/lib/config";
 
-const primaryMenuItems = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/dpa", label: "Profil DPA" },
-  { href: "/hearing", label: "Presensi Hearing" },
-  { href: "/calon", label: "Profil Calon" },
-  { href: "/voting", label: "Voting" },
-  { href: "/hasil", label: "Hasil Voting" },
-  { href: "/profile", label: "Cek Status" },
-  { href: "/profil", label: "Profil User" },
-  { href: "/bantuan", label: "Bantuan & Chat" },
-  { href: "/setting", label: "Setting" },
-];
+const getPrimaryMenuItems = () => {
+  const baseItems = [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/dpa", label: "Profil DPA" },
+  ];
+
+  const bpSelectionItems = FEATURES.BP_SELECTION_ACTIVE
+    ? [
+        { href: "/hearing", label: "Presensi Hearing" },
+        { href: "/calon", label: "Profil Calon" },
+        { href: "/voting", label: "Voting" },
+        { href: "/hasil", label: "Hasil Voting" },
+        { href: "/profile", label: "Cek Status" },
+      ]
+    : [];
+
+  const otherItems = [
+    { href: "/lpj-presensi", label: "Presensi LPJ AT" },
+    { href: "/profil", label: "Profil User" },
+    { href: "/bantuan", label: "Bantuan & Chat" },
+    { href: "/setting", label: "Setting" },
+  ];
+
+  return [...baseItems, ...bpSelectionItems, ...otherItems];
+};
 
 export function MainNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const primaryMenuItems = getPrimaryMenuItems();
 
   function closeMenu() {
     setIsMenuOpen(false);
