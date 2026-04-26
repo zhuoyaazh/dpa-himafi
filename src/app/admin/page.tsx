@@ -95,6 +95,9 @@ type AnnouncementHistory = {
   id: string;
   title: string;
   content: string;
+  linkUrl?: string;
+  linkUrls?: string[];
+  links?: Array<{ label: string; url: string }>;
   updatedAt?: Timestamp;
 };
 
@@ -117,6 +120,7 @@ export default function AdminPage() {
   const [deletingSessionId, setDeletingSessionId] = useState("");
   const [announcementTitle, setAnnouncementTitle] = useState("Informasi Penting");
   const [announcementContent, setAnnouncementContent] = useState("");
+  const [announcementLinks, setAnnouncementLinks] = useState<Array<{ label: string; url: string }>>([]);
   const [announcementHistory, setAnnouncementHistory] = useState<AnnouncementHistory[]>([]);
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState("");
   const [deletingAnnouncementId, setDeletingAnnouncementId] = useState("");
@@ -246,12 +250,48 @@ export default function AdminPage() {
     );
 
     const announcements = snapshot.docs.map((doc) => {
-      const data = doc.data() as { title?: string; content?: string; updatedAt?: Timestamp };
+      const data = doc.data() as {
+        title?: string;
+        content?: string;
+        linkUrl?: string;
+        linkUrls?: unknown;
+        links?: unknown;
+        updatedAt?: Timestamp;
+      };
+
+      const normalizedLinks = Array.isArray(data.links)
+        ? data.links
+            .filter(
+              (item): item is { label?: unknown; url?: unknown } =>
+                typeof item === "object" && item !== null,
+            )
+            .map((item, index) => ({
+              label: typeof item.label === "string" ? item.label.trim() : `Link ${index + 1}`,
+              url: typeof item.url === "string" ? item.url.trim() : "",
+            }))
+            .filter((item) => Boolean(item.url))
+        : [];
+
+      const normalizedLegacyLink = data.linkUrl?.trim() ?? "";
+      const normalizedLinkArray = Array.isArray(data.linkUrls)
+        ? data.linkUrls.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+        : [];
+
+      const mergedLinks = Array.from(new Set([...normalizedLinkArray, normalizedLegacyLink].filter(Boolean)));
+      const nextLinks = [...normalizedLinks];
+      mergedLinks.forEach((url) => {
+        if (!nextLinks.some((item) => item.url === url)) {
+          nextLinks.push({ label: `Link ${nextLinks.length + 1}`, url });
+        }
+      });
 
       return {
         id: doc.id,
         title: data.title?.trim() ?? "Informasi Penting",
         content: data.content?.trim() ?? "",
+        linkUrl: mergedLinks[0] ?? "",
+        linkUrls: mergedLinks,
+        links: nextLinks,
         updatedAt: data.updatedAt,
       };
     });
@@ -262,13 +302,40 @@ export default function AdminPage() {
     if (currentDoc) {
       setAnnouncementTitle(currentDoc.title);
       setAnnouncementContent(currentDoc.content);
+      setAnnouncementLinks(currentDoc.links ?? []);
       setSelectedAnnouncementId("current");
     } else if (announcements.length > 0) {
       setAnnouncementTitle(announcements[0].title);
       setAnnouncementContent(announcements[0].content);
+      setAnnouncementLinks(announcements[0].links ?? []);
       setSelectedAnnouncementId(announcements[0].id);
     }
   }, []);
+
+  function onAddAnnouncementLinkField() {
+    setAnnouncementLinks((previous) => [...previous, { label: "", url: "" }]);
+  }
+
+  function onUpdateAnnouncementLinkAt(index: number, patch: { label?: string; url?: string }) {
+    setAnnouncementLinks((previous) => {
+      const next = [...previous];
+
+      while (next.length <= index) {
+        next.push({ label: "", url: "" });
+      }
+
+      next[index] = {
+        ...next[index],
+        ...patch,
+      };
+
+      return next;
+    });
+  }
+
+  function onRemoveAnnouncementLinkAt(index: number) {
+    setAnnouncementLinks((previous) => previous.filter((_, currentIndex) => currentIndex !== index));
+  }
 
   const loadResultsVisibility = useCallback(async () => {
     const snapshot = await getDoc(doc(db, "site_settings", "results_visibility"));
@@ -308,10 +375,39 @@ export default function AdminPage() {
       const settingsDoc = await getDoc(doc(db, "lpj_settings", "current"));
       const activeId = settingsDoc.data()?.activeSessionId ?? "";
       setActiveLpjSessionId(activeId);
+
+      if (activeId) {
+        const activeSessionDoc = await getDoc(doc(db, "lpj_sessions", activeId));
+        if (activeSessionDoc.exists()) {
+          setLpjSettings(mapSessionToForm(activeSessionDoc.data()));
+          setSelectedLpjSessionId(activeId);
+          setEditingLpjSessionId("");
+          return;
+        }
+      }
+
+      if (sessions.length > 0) {
+        const latestSessionDoc = await getDoc(doc(db, "lpj_sessions", sessions[0].id));
+        if (latestSessionDoc.exists()) {
+          setLpjSettings(mapSessionToForm(latestSessionDoc.data()));
+          setSelectedLpjSessionId(sessions[0].id);
+          setEditingLpjSessionId("");
+        }
+      } else {
+        setLpjSettings({
+          sessionName: "",
+          isActive: false,
+          presensiAwalAktif: true,
+          presensiAkhirAktif: true,
+          presensiAwalToken: "",
+          presensiAkhirToken: "",
+        });
+        setSelectedLpjSessionId("");
+      }
     } catch {
       setMessage("Gagal memuat data sesi LPJ.");
     }
-  }, []);
+  }, [mapSessionToForm]);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -499,6 +595,14 @@ export default function AdminPage() {
         {
           title: announcementTitle.trim() || "Informasi Penting",
           content: announcementContent.trim(),
+          linkUrl: Array.from(new Set(announcementLinks.map((link) => link.url.trim()).filter(Boolean)))[0] ?? "",
+          linkUrls: Array.from(new Set(announcementLinks.map((link) => link.url.trim()).filter(Boolean))),
+          links: announcementLinks
+            .map((link, index) => ({
+              label: link.label.trim() || `Link ${index + 1}`,
+              url: link.url.trim(),
+            }))
+            .filter((link) => Boolean(link.url)),
           updatedAt: serverTimestamp(),
           updatedByUid: user.uid,
           updatedByEmail: user.email,
@@ -524,6 +628,7 @@ export default function AdminPage() {
 
     setAnnouncementTitle(announcement.title);
     setAnnouncementContent(announcement.content);
+    setAnnouncementLinks(announcement.links ?? []);
     setSelectedAnnouncementId(announcementId);
   }
 
@@ -546,6 +651,7 @@ export default function AdminPage() {
       if (selectedAnnouncementId === announcementId) {
         setAnnouncementTitle("Informasi Penting");
         setAnnouncementContent("");
+        setAnnouncementLinks([]);
         setSelectedAnnouncementId("");
       }
 
@@ -780,6 +886,10 @@ export default function AdminPage() {
           isActive: lpjSettings.isActive,
           presensiAwalAktif: lpjSettings.presensiAwalAktif,
           presensiAkhirAktif: lpjSettings.presensiAkhirAktif,
+          presensiAwalToken: lpjSettings.presensiAwalToken.trim(),
+          presensiAkhirToken: lpjSettings.presensiAkhirToken.trim(),
+          checkInToken: lpjSettings.presensiAwalToken.trim(),
+          checkOutToken: lpjSettings.presensiAkhirToken.trim(),
           updatedAt: serverTimestamp(),
           updatedByUid: user.uid,
           updatedByEmail: user.email,
@@ -1255,6 +1365,44 @@ export default function AdminPage() {
                   placeholder="Tulis pengumuman untuk dashboard"
                 />
               </label>
+
+              <section className="grid gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">Link (opsional)</span>
+                  <button
+                    type="button"
+                    onClick={onAddAnnouncementLinkField}
+                    className="button-outline inline-flex"
+                  >
+                    + Tambah Link
+                  </button>
+                </div>
+
+                {(announcementLinks.length > 0 ? announcementLinks : [{ label: "", url: "" }]).map((link, index) => (
+                  <div key={`announcement-link-${index}`} className="flex items-center gap-2">
+                    <input
+                      value={link.label}
+                      onChange={(event) => onUpdateAnnouncementLinkAt(index, { label: event.target.value })}
+                      className="input-luxury"
+                      placeholder={`Label tombol ${index + 1}: contoh Draft LPJ`}
+                    />
+                    <input
+                      value={link.url}
+                      onChange={(event) => onUpdateAnnouncementLinkAt(index, { url: event.target.value })}
+                      className="input-luxury"
+                      placeholder={`Contoh link ${index + 1}: https://example.com/pengumuman`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onRemoveAnnouncementLinkAt(index)}
+                      className="button-outline inline-flex shrink-0"
+                      disabled={announcementLinks.length === 0}
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                ))}
+              </section>
 
               <button
                 type="button"

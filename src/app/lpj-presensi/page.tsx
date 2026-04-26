@@ -63,8 +63,8 @@ export default function LpjPresensiPage() {
           isActive: sessionDoc.data().isActive ?? false,
           presensiAwalAktif: sessionDoc.data().presensiAwalAktif ?? false,
           presensiAkhirAktif: sessionDoc.data().presensiAkhirAktif ?? false,
-          presensiAwalToken: sessionDoc.data().presensiAwalToken ?? "",
-          presensiAkhirToken: sessionDoc.data().presensiAkhirToken ?? "",
+          presensiAwalToken: sessionDoc.data().presensiAwalToken ?? sessionDoc.data().checkInToken ?? "",
+          presensiAkhirToken: sessionDoc.data().presensiAkhirToken ?? sessionDoc.data().checkOutToken ?? "",
         });
         setStatusMessage("Pengaturan presensi LPJ AT berhasil dimuat.");
       } else {

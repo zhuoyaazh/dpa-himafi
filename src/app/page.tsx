@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, doc, getDoc, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -15,6 +15,9 @@ import { FEATURES } from "@/lib/config";
 type ImportantInfo = {
   title: string;
   content: string;
+  linkUrl?: string;
+  linkUrls?: string[];
+  links?: Array<{ label: string; url: string }>;
   updatedAtLabel: string;
 };
 
@@ -64,6 +67,47 @@ function getNimFromEmail(email: string | null | undefined) {
   return normalizeNim(localPart);
 }
 
+function isValidHttpUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function renderContentWithLinks(content: string) {
+  const lines = content.split("\n");
+
+  return lines.map((line, lineIndex) => {
+    const parts = line.split(/(https?:\/\/[^\s]+)/g);
+    const renderedParts: ReactNode[] = parts.map((part, partIndex) => {
+      if (isValidHttpUrl(part)) {
+        return (
+          <a
+            key={`link-${lineIndex}-${partIndex}`}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-[--maroon] underline decoration-[--gold] underline-offset-2"
+          >
+            {part}
+          </a>
+        );
+      }
+
+      return <span key={`text-${lineIndex}-${partIndex}`}>{part}</span>;
+    });
+
+    return (
+      <span key={`line-${lineIndex}`}>
+        {renderedParts}
+        {lineIndex < lines.length - 1 ? <br /> : null}
+      </span>
+    );
+  });
+}
+
 export default function Home() {
   const router = useRouter();
   const countdown = useVotingCountdown();
@@ -89,16 +133,45 @@ export default function Home() {
         const data = snapshot.data() as {
           title?: string;
           content?: string;
+          linkUrl?: string;
+          linkUrls?: unknown;
+          links?: unknown;
           updatedAt?: { toDate?: () => Date };
         };
 
         const title = data.title?.trim() ?? "Informasi Penting";
         const content = data.content?.trim() ?? "Belum ada informasi terbaru dari admin.";
+        const linkUrl = data.linkUrl?.trim() ?? "";
+        const normalizedStructuredLinks = Array.isArray(data.links)
+          ? data.links
+              .filter(
+                (item): item is { label?: unknown; url?: unknown } =>
+                  typeof item === "object" && item !== null,
+              )
+              .map((item, index) => ({
+                label: typeof item.label === "string" ? item.label.trim() : `Link ${index + 1}`,
+                url: typeof item.url === "string" ? item.url.trim() : "",
+              }))
+              .filter((item) => Boolean(item.url))
+          : [];
+        const linkUrls = Array.isArray(data.linkUrls)
+          ? data.linkUrls.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+          : [];
+        const mergedLinks = Array.from(new Set([...linkUrls, linkUrl].filter(Boolean)));
+        const links = [...normalizedStructuredLinks];
+        mergedLinks.forEach((url) => {
+          if (!links.some((item) => item.url === url)) {
+            links.push({ label: `Link ${links.length + 1}`, url });
+          }
+        });
         const updatedAtDate = data.updatedAt?.toDate ? data.updatedAt.toDate() : null;
 
         setImportantInfo({
           title,
           content,
+          linkUrl: mergedLinks[0] ?? "",
+          linkUrls: mergedLinks,
+          links,
           updatedAtLabel: updatedAtDate ? updatedAtDate.toLocaleString() : "-",
         });
       } catch {
@@ -295,6 +368,7 @@ export default function Home() {
         </div>
       </header>
 
+      {false ? (
       <article className="gold-card overflow-hidden p-6">
         <p className="subtitle-strong">Status Voting</p>
         <h2 className="mt-2 font-display text-3xl text-[--maroon]">Countdown Penutupan</h2>
@@ -326,15 +400,31 @@ export default function Home() {
         )}
         <p className="mt-3 text-xs text-foreground/60">Voting ditutup otomatis pada 01 Apr 2026, 23:59 WIB.</p>
       </article>
+      ) : null}
 
       <article className="gold-card overflow-hidden p-6">
         <p className="subtitle-strong">Informasi Penting</p>
         <h2 className="mt-2 font-display text-3xl text-[--maroon]">
           {importantInfo?.title ?? "Informasi Penting"}
         </h2>
-        <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-foreground/80">
-          {importantInfo?.content ?? "Belum ada informasi terbaru dari admin."}
-        </p>
+        <div className="mt-3 whitespace-pre-wrap text-sm leading-7 text-foreground/80">
+          {renderContentWithLinks(importantInfo?.content ?? "Belum ada informasi terbaru dari admin.")}
+        </div>
+        {(importantInfo?.links ?? []).filter((item) => isValidHttpUrl(item.url)).length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(importantInfo?.links ?? []).filter((item) => isValidHttpUrl(item.url)).map((item, index) => (
+              <a
+                key={`important-link-${index}`}
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="button-outline inline-flex"
+              >
+                {item.label || `Link ${index + 1}`}
+              </a>
+            ))}
+          </div>
+        ) : null}
         <p className="mt-3 text-xs text-foreground/60">
           Update terakhir: {importantInfo?.updatedAtLabel ?? "-"}
         </p>
