@@ -335,7 +335,7 @@ export default function Home() {
         </h1>
         {currentUser ? (
           <p className="text-sm text-foreground/75">
-            Hai, Selamat Datang {greetingName}! Jangan lupa voting ya.
+            Hai, Selamat Datang {greetingName}! 
           </p>
         ) : (
           <p className="text-sm text-foreground/75">
